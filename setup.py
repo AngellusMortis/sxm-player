@@ -14,6 +14,7 @@ with open('HISTORY.rst') as history_file:
 requirements = [
     'aiohttp<3.5.0',
     'click>=7.0',
+    'coloredlogs',
     'discord.py[voice]==1.0.0a0',
     'sxm[async]==0.1.0',
     'tabulate',

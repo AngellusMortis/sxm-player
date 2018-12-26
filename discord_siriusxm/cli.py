@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 
 """Console script for discord_siriusxm."""
-import logging
 import sys
-from multiprocessing import Pool, Manager
+from multiprocessing import Manager, Pool
 
 import click
 
+import coloredlogs
+
 from .bot import run_bot
-from .server import run_server
 from .models import XMState
+from .server import run_server
 
 
 @click.command()
@@ -28,7 +29,7 @@ from .models import XMState
 def main(username, password, token, prefix, description, port):
     """Command line interface for SiriusXM radio bot for Discord"""
 
-    logging.basicConfig(level=logging.INFO)
+    coloredlogs.install(level='INFO')
 
     with Manager() as manager:
         state = manager.dict()

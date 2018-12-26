@@ -44,7 +44,12 @@ class SiriusXMProxyServer:
         self._log.info(
             f'running SiriusXM proxy server on http://0.0.0.0:{self._port}'
         )
-        web.run_app(app, access_log=self._log, print=None, port=self._port)
+        web.run_app(
+            app,
+            access_log=logging.getLogger('discord_siriusxm.server.request'),
+            print=None,
+            port=self._port
+        )
 
 
 def run_server(state, port, username, password):
