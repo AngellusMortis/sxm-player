@@ -36,6 +36,7 @@ class XMState(DictState):
         state['channels'] = []
         state['start_time'] = None
         state['live'] = None
+        state['processing_file'] = False
 
     @property
     def channels(self) -> List[XMChannel]:
@@ -71,9 +72,9 @@ class XMState(DictState):
                 return channel
         return None
 
-    def set_channel(self, channel_id):
+    def set_channel(self, channel_id, start_time=None):
         self.active_channel_id = channel_id
-        self.start_time = time.time()
+        self.start_time = start_time or int(time.time() * 1000)
         self.live = None
 
     def reset_channel(self):

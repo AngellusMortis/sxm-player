@@ -1,12 +1,17 @@
 import asyncio
 import logging
+import os
+import time
 
 import discord
 from discord.ext import commands as discord_commands
-from sxm.models import XMImage, XMSong
 from tabulate import tabulate
 
+from sxm.models import XMImage, XMSong
+
 from .models import BotState
+from .player import FFmpegPCMAudio
+from .archiver import MAX_ARCHIVE_TIME
 
 
 class SiriusXMActivity(discord.Game):
@@ -57,12 +62,17 @@ class SiriusXMBotCog:
     _xm = None
     _bot = None
     _state = None
+    _output_folder = None
 
-    def __init__(self, bot, state, port):
+    def __init__(self, bot, state, port, output_folder):
         self._bot = bot
         self._state = BotState(state)
         self._log = logging.getLogger('discord_siriusxm.bot')
         self._proxy_base = f'http://127.0.0.1:{port}'
+        self._output_folder = output_folder
+
+        if self._output_folder is not None:
+            self._output_folder = os.path.join(self._output_folder, 'streams')
 
         self._bot.loop.create_task(self.status_update())
 
@@ -74,19 +84,66 @@ class SiriusXMBotCog:
 
         while not self._bot.is_closed():
             activity = None
-            if self._state.is_playing and \
-                    self._state.xm_state.live is not None:
-                channel = self._state.xm_state.get_channel(
+            if self._state.is_playing:
+                xm_channel = self._state.xm_state.get_channel(
                     self._state.xm_state.active_channel_id)
 
-                activity = SiriusXMActivity(
-                    start=self._state.xm_state.start_time,
-                    channel=channel,
-                    live_channel=self._state.xm_state.live,
-                )
+                reset_channel = False
+                if self._output_folder is not None and \
+                        not self._state.xm_state.processing_file:
+                    now = int(time.time())
+                    start = self._state.xm_state.start_time / 1000
+                    if (now - start) > MAX_ARCHIVE_TIME:
+                        reset_channel = True
+
+                if reset_channel:
+                    await self.play_channel(xm_channel)
+                elif self._state.xm_state.live is not None:
+                    activity = SiriusXMActivity(
+                        start=self._state.xm_state.start_time,
+                        channel=xm_channel,
+                        live_channel=self._state.xm_state.live,
+                    )
 
             await self._bot.change_presence(activity=activity)
             await asyncio.sleep(1)
+
+    async def play_channel(self, xm_channel) -> bool:
+        xm_url = f'{self._proxy_base}/{xm_channel.id}.m3u8'
+
+        if self._state.source is not None:
+            self._state.xm_state.reset_channel()
+            self._state.voice.stop()
+            self._state.source.cleanup()
+            self._state.source = None
+            await asyncio.sleep(0.5)
+
+        extra_args = None
+        if self._output_folder is not None:
+            extra_args = os.path.join(
+                self._output_folder, f'{xm_channel.id}.mp3')
+
+        try:
+            self._state.source = discord.PCMVolumeTransformer(
+                FFmpegPCMAudio(
+                    xm_url,
+                    before_options='-y -f hls',
+                    after_options=extra_args,
+                ),
+                volume=0.5
+            )
+            self._state.voice.play(self._state.source)
+        except Exception as e:
+            self._log.error(f'{type(e).__name__}: {e}')
+            await self._state.voice.disconnect()
+            return False
+
+        self._state.xm_state.set_channel(xm_channel.id)
+        self._log.debug(
+            f'play_channel: {xm_channel.pretty_name}: '
+            f'{self._state.voice.channel.id}'
+        )
+        return True
 
     @discord_commands.command(pass_context=True)
     async def channels(self, ctx):
@@ -237,36 +294,20 @@ class SiriusXMBotCog:
             await channel.send(f'{author.mention}, `{channel_id}` is invalid')
             return
 
-        xm_url = f'{self._proxy_base}/{xm_channel.id}.m3u8'
         if not self._state.is_playing:
             await ctx.invoke(self.summon)
-        if self._state.source is not None:
-            self._state.xm_state.reset_channel()
-            self._state.voice.stop()
-            self._state.source.cleanup()
-            self._state.source = None
-            await asyncio.sleep(0.5)
 
-        try:
-            self._state.source = discord.PCMVolumeTransformer(
-                discord.FFmpegPCMAudio(xm_url, before_options='-f hls'),
-                volume=0.5
-            )
-            self._state.voice.play(self._state.source)
-        except Exception as e:
-            await self._state.voice.disconnect()
-            await channel.send(
-                f'{author.mention}, something went wrong starting stream')
-            self._log.error(f'{type(e).__name__}: {e}')
-        else:
-            self._state.xm_state.set_channel(xm_channel.id)
-            self._log.debug(
-                f'play: {xm_channel.pretty_name}: {author.voice.channel.id}')
+        success = await self.play_channel(xm_channel)
+
+        if success:
             await channel.send(
                 f'{author.mention} starting playing '
                 f'**{xm_channel.pretty_name}** in '
                 f'**{author.voice.channel.mention}**'
             )
+        else:
+            await channel.send(
+                f'{author.mention}, something went wrong starting stream')
 
     @discord_commands.command(pass_context=True, no_pm=True)
     async def np(self, ctx):
@@ -336,13 +377,13 @@ class SiriusXMBotCog:
         await channel.send(author.mention, embed=embed)
 
 
-def run_bot(prefix, description, state, token, port):
+def run_bot(prefix, description, state, token, port, output_folder):
     bot = discord_commands.Bot(
         command_prefix=prefix,
         description=description,
         pm_help=True
     )
-    bot.add_cog(SiriusXMBotCog(bot, state, port))
+    bot.add_cog(SiriusXMBotCog(bot, state, port, output_folder))
     logger = logging.getLogger('discord_siriusxm.bot')
 
     @bot.event
