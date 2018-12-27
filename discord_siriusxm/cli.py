@@ -12,6 +12,7 @@ from .bot import run_bot
 from .models import XMState
 from .server import run_server
 from .archiver import run_archiver
+from .processor import run_processor
 
 
 @click.command()
@@ -29,7 +30,10 @@ from .archiver import run_archiver
               help='port to run SiriusXM Proxy server on')
 @click.option('-o', '--output-folder', type=click.Path(), default=None,
               help='output folder to save stream off to as it plays them')
-def main(username, password, token, prefix, description, port, output_folder):
+@click.option('-r', '--reset-songs', is_flag=True,
+              help='reset processed song database')
+def main(username, password, token, prefix, description,
+         port, output_folder, reset_songs):
     """Command line interface for SiriusXM radio bot for Discord"""
 
     coloredlogs.install(level='INFO')
@@ -40,13 +44,21 @@ def main(username, password, token, prefix, description, port, output_folder):
 
         process_count = 2
         if output_folder is not None:
-            process_count = 3
+            process_count = 4
 
         with Pool(processes=process_count) as pool:
             if output_folder is not None:
-                pool.apply_async(func=run_archiver, args=(state, output_folder))
-            pool.apply_async(func=run_server, args=(state, port, username, password))
-            pool.apply(func=run_bot, args=(prefix, description, state, token, port, output_folder))
+                pool.apply_async(
+                    func=run_archiver, args=(state, output_folder))
+                pool.apply_async(
+                    func=run_processor, args=(state, output_folder, reset_songs))
+
+            pool.apply_async(
+                func=run_server, args=(state, port, username, password))
+            pool.apply(
+                func=run_bot,
+                args=(prefix, description, state, token, port, output_folder)
+            )
             pool.close()
             pool.join()
     return 0

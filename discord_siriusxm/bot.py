@@ -97,8 +97,10 @@ class SiriusXMBotCog:
                         reset_channel = True
 
                 if reset_channel:
+                    self._log.info('resetting channel')
                     await self.play_channel(xm_channel)
                 elif self._state.xm_state.live is not None:
+                    self._log.debug('status update')
                     activity = SiriusXMActivity(
                         start=self._state.xm_state.start_time,
                         channel=xm_channel,
@@ -106,7 +108,7 @@ class SiriusXMBotCog:
                     )
 
             await self._bot.change_presence(activity=activity)
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
 
     async def play_channel(self, xm_channel) -> bool:
         xm_url = f'{self._proxy_base}/{xm_channel.id}.m3u8'
@@ -118,17 +120,23 @@ class SiriusXMBotCog:
             self._state.source = None
             await asyncio.sleep(0.5)
 
-        extra_args = None
+        stream_file = None
+        log_archive = ''
         if self._output_folder is not None:
-            extra_args = os.path.join(
+            log_archive = f': archiving'
+            stream_file = os.path.join(
                 self._output_folder, f'{xm_channel.id}.mp3')
 
+            if os.path.exists(stream_file):
+                os.remove(stream_file)
+
         try:
+            self._log.info(f'play{log_archive}: {xm_channel.id}')
             self._state.source = discord.PCMVolumeTransformer(
                 FFmpegPCMAudio(
                     xm_url,
-                    before_options='-y -f hls',
-                    after_options=extra_args,
+                    before_options='-f hls',
+                    after_options=stream_file,
                 ),
                 volume=0.5
             )

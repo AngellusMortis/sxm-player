@@ -3,7 +3,12 @@ from dataclasses import dataclass
 from typing import List
 
 import discord
+
+from sqlalchemy import Column, DateTime, String
+from sqlalchemy.ext.declarative import declarative_base
 from sxm.models import XMChannel, XMLiveChannel
+
+Base = declarative_base()
 
 
 class DictState:
@@ -29,6 +34,8 @@ class DictState:
 class XMState(DictState):
     """Class to store state SiriusXM Radio player for Discord Bot"""
     _channels = None
+    _live_update_time = None
+    _live = None
 
     @staticmethod
     def init_state(state):
@@ -37,6 +44,7 @@ class XMState(DictState):
         state['start_time'] = None
         state['live'] = None
         state['processing_file'] = False
+        state['live_update_time'] = None
 
     @property
     def channels(self) -> List[XMChannel]:
@@ -53,8 +61,11 @@ class XMState(DictState):
 
     @property
     def live(self) -> XMLiveChannel:
-        if self._live is None:
+        last_update = self._state_dict['live_update_time']
+        if self._live is None or \
+                self._live_update_time != last_update:
             if self._state_dict['live'] is not None:
+                self._live_update_time = last_update
                 self._live = XMLiveChannel(self._state_dict['live'])
         return self._live
 
@@ -62,6 +73,8 @@ class XMState(DictState):
     def live(self, value):
         self._live = None
         self._state_dict['live'] = value
+        if value is not None:
+            self._state_dict['live_update_time'] = time.time()
 
     def get_channel(self, name):
         name = name.lower()
@@ -96,3 +109,25 @@ class BotState:
     @property
     def is_playing(self) -> bool:
         return not(self.voice is None or self.source is None)
+
+
+class Song(Base):
+    __tablename__ = 'songs'
+
+    guid = Column(String, primary_key=True)
+    title = Column(String)
+    artist = Column(String)
+    album = Column(String, nullable=True)
+    channel = Column(String)
+    file_path = Column(String)
+
+
+class Episode(Base):
+    __tablename__ = 'episodes'
+
+    guid = Column(String, primary_key=True)
+    title = Column(String)
+    show = Column(String, nullable=True)
+    air_time = Column(DateTime)
+    channel = Column(String)
+    file_path = Column(String)
