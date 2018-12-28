@@ -49,6 +49,8 @@ def path_filter(word):
         .replace('Counterfeit.', 'Counterfeit')\
         .replace('F**ker', 'Fucker')\
         .replace('Trust?', 'Trust')\
+        .replace('P.O.D.', 'POD')\
+        .replace('//', '-')\
         .strip()
 
 
