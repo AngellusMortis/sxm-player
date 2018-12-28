@@ -102,7 +102,7 @@ def process_cut(archives, db, cut, output_folder,
                 album_or_show = path_filter(cut.episode.show.long_title or
                                             cut.episode.show.medium_title)
 
-            filename = f'{title}.{air_time.isoformat()}.{cut.guid}.mp3'
+            filename = f'{title}.{air_time.strftime("%Y-%m-%d-%H.%M")}.{cut.guid}.mp3'
             folder = output_folder
 
             if album_or_show is not None:
@@ -119,6 +119,12 @@ def process_cut(archives, db, cut, output_folder,
         #     logger.error(f'error occurred in trimming: {e}')
 
         if path is not None:
+            if os.path.getsize(path) < 1000:
+                logger.error(
+                    f'spliced file too small, deleting {path}: {archive}')
+                os.remove(path)
+                return False
+
             db_item = None
 
             if is_song:
@@ -183,6 +189,7 @@ def process_cuts(archives, db, output_folder, channel_id, cuts, is_song=True):
         logger.warn(
             f'processing {title}: '
             f'{cut.time}: {cut.duration}'
+            f'{cut.guid}'
         )
         success = process_cut(
             archives, db, cut, output_folder, channel_id, is_song)
