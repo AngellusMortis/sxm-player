@@ -12,7 +12,7 @@ from .utils import get_files, splice_file
 logger = logging.getLogger('discord_siriusxm.processor')
 
 
-def init_db(base_folder, reset=False):
+def init_db(base_folder, cleanup=True, reset=False):
     os.makedirs(base_folder, exist_ok=True)
 
     song_db = os.path.join(base_folder, 'songs.db')
@@ -23,6 +23,22 @@ def init_db(base_folder, reset=False):
     db_engine = create_engine(f'sqlite:///{song_db}')
     Base.metadata.create_all(db_engine)
     db_session = sessionmaker(bind=db_engine)()
+
+    if cleanup:
+        removed = 0
+        for song in db_session.query(Song).all():
+            if not os.path.exists(song.file_path):
+                removed += 1
+                db_session.delete(song)
+
+        for show in db_session.query(Episode).all():
+            if not os.path.exists(show.file_path):
+                removed += 1
+                db_session.delete(show)
+
+        if removed > 0:
+            logger.warn(f'deleted missing songs/shows: {removed}')
+            db_session.commit()
 
     return db_session
 
@@ -61,6 +77,10 @@ def process_cut(archives, db, cut, output_folder,
         filename = None
         folder = None
 
+        air_time = datetime.datetime.fromtimestamp(
+            int(cut.time/1000), tz=datetime.timezone.utc)
+        air_time = air_time.replace(minute=0, second=0, microsecond=0)
+
         if is_song:
             title = path_filter(cut.cut.title)
             artist = path_filter(cut.cut.artists[0].name)
@@ -81,9 +101,6 @@ def process_cut(archives, db, cut, output_folder,
                 album_or_show = path_filter(cut.episode.show.long_title or
                                             cut.episode.show.medium_title)
 
-            air_time = datetime.fromtimestamp(
-                cut.time, tz=datetime.timezone.utc)
-            air_time = air_time.replace(minute=0, second=0, microsecond=0)
             filename = f'{title}.{air_time.isoformat()}.{cut.guid}.mp3'
             folder = output_folder
 
@@ -109,6 +126,7 @@ def process_cut(archives, db, cut, output_folder,
                     title=title,
                     artist=artist,
                     album=album_or_show,
+                    air_time=air_time,
                     channel=active_channel_id,
                     file_path=path
                 )
@@ -175,7 +193,7 @@ def run_processor(state, output_folder, reset_songs):
     os.makedirs(processed_folder, exist_ok=True)
     os.makedirs(archive_folder, exist_ok=True)
 
-    db = init_db(processed_folder, reset_songs)
+    db = init_db(processed_folder, True, reset_songs)
 
     logger.warn(f'processor started: {output_folder}')
     sleep_time = 10

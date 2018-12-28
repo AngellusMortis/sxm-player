@@ -16,6 +16,7 @@ requirements = [
     'click>=7.0',
     'coloredlogs',
     'discord.py[voice]==1.0.0a0',
+    'humanize',
     'pydub',
     'sqlalchemy',
     'sxm[async]==0.1.0',

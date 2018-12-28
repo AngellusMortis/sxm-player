@@ -1,21 +1,24 @@
 import asyncio
+import datetime
 import logging
 import os
 import time
 
 import discord
+import humanize
 from discord.ext import commands as discord_commands
 from tabulate import tabulate
 
+from sqlalchemy import or_
 from sxm.models import XMImage, XMSong
 
-from .models import BotState
+from .models import BotState, Episode, Song
 from .player import FFmpegPCMAudio
-from .archiver import MAX_ARCHIVE_TIME
+from .processor import init_db
 
 
 class SiriusXMActivity(discord.Game):
-    def __init__(self, start, channel, live_channel, **kwargs):
+    def __init__(self, start, radio_time, channel, live_channel, **kwargs):
         self.timestamps = {'start': start}
         self._start = start
         self.details = 'Test'
@@ -29,19 +32,21 @@ class SiriusXMActivity(discord.Game):
         self.session_id = kwargs.pop('session_id', None)
         self._end = 0
 
-        self.update_status(channel, live_channel)
+        self.update_status(channel, live_channel, radio_time)
 
-    def update_status(self, channel, live_channel):
+    def update_status(self, channel, live_channel, radio_time):
         self.state = "Playing music from SiriusXM"
         self.name = f'SiriusXM {channel.pretty_name}'
         self.large_image_url = None
         self.large_image_text = None
 
-        latest_cut = live_channel.get_latest_cut()
+        latest_cut = live_channel.get_latest_cut(now=radio_time)
         if latest_cut is not None and isinstance(latest_cut.cut, XMSong):
             song = latest_cut.cut
+            pretty_name = Song.get_pretty_name(
+                song.title, song.artists[0].name)
             self.name = (
-                f'"{song.title}" by {song.artists[0].name} on {self.name}')
+                f'{pretty_name} on {self.name}')
 
             if song.album is not None:
                 album = song.album
@@ -66,7 +71,7 @@ class SiriusXMBotCog:
 
     def __init__(self, bot, state, port, output_folder):
         self._bot = bot
-        self._state = BotState(state)
+        self._state = BotState(state, bot)
         self._log = logging.getLogger('discord_siriusxm.bot')
         self._proxy_base = f'http://127.0.0.1:{port}'
         self._output_folder = output_folder
@@ -77,81 +82,39 @@ class SiriusXMBotCog:
         self._bot.loop.create_task(self.status_update())
 
     def __unload(self):
-        pass
+        if self._state.player is not None:
+            self._bot.loop.create_task(self._state.player.stop())
+        self._state.xm_state.reset_channel()
 
     async def status_update(self):
         await self._bot.wait_until_ready()
 
+        sleep_time = 10
         while not self._bot.is_closed():
+            await asyncio.sleep(sleep_time)
+            sleep_time = 5
+
             activity = None
-            if self._state.is_playing:
-                xm_channel = self._state.xm_state.get_channel(
-                    self._state.xm_state.active_channel_id)
+            if self._state.player.is_playing:
+                if self._state.xm_state.active_channel_id is not None:
+                    xm_channel = self._state.xm_state.get_channel(
+                        self._state.xm_state.active_channel_id)
 
-                reset_channel = False
-                if self._output_folder is not None and \
-                        not self._state.xm_state.processing_file:
-                    now = int(time.time())
-                    start = self._state.xm_state.start_time / 1000
-                    if (now - start) > MAX_ARCHIVE_TIME:
-                        reset_channel = True
-
-                if reset_channel:
-                    self._log.info('resetting channel')
-                    await self.play_channel(xm_channel)
-                elif self._state.xm_state.live is not None:
-                    self._log.debug('status update')
-                    activity = SiriusXMActivity(
-                        start=self._state.xm_state.start_time,
-                        channel=xm_channel,
-                        live_channel=self._state.xm_state.live,
-                    )
+                    if self._state.xm_state.live is not None:
+                        self._log.debug('status update: SiriusXM')
+                        activity = SiriusXMActivity(
+                            start=self._state.xm_state.start_time,
+                            radio_time=self._state.xm_state.radio_time,
+                            channel=xm_channel,
+                            live_channel=self._state.xm_state.live,
+                        )
+                elif self._state.player.current is not None:
+                    self._log.debug(
+                        f'status update: {self._state.player.current}')
+                    activity = discord.Game(
+                        name=self._state.player.current.pretty_name)
 
             await self._bot.change_presence(activity=activity)
-            await asyncio.sleep(5)
-
-    async def play_channel(self, xm_channel) -> bool:
-        xm_url = f'{self._proxy_base}/{xm_channel.id}.m3u8'
-
-        if self._state.source is not None:
-            self._state.xm_state.reset_channel()
-            self._state.voice.stop()
-            self._state.source.cleanup()
-            self._state.source = None
-            await asyncio.sleep(0.5)
-
-        stream_file = None
-        log_archive = ''
-        if self._output_folder is not None:
-            log_archive = f': archiving'
-            stream_file = os.path.join(
-                self._output_folder, f'{xm_channel.id}.mp3')
-
-            if os.path.exists(stream_file):
-                os.remove(stream_file)
-
-        try:
-            self._log.info(f'play{log_archive}: {xm_channel.id}')
-            self._state.source = discord.PCMVolumeTransformer(
-                FFmpegPCMAudio(
-                    xm_url,
-                    before_options='-f hls',
-                    after_options=stream_file,
-                ),
-                volume=0.5
-            )
-            self._state.voice.play(self._state.source)
-        except Exception as e:
-            self._log.error(f'{type(e).__name__}: {e}')
-            await self._state.voice.disconnect()
-            return False
-
-        self._state.xm_state.set_channel(xm_channel.id)
-        self._log.debug(
-            f'play_channel: {xm_channel.pretty_name}: '
-            f'{self._state.voice.channel.id}'
-        )
-        return True
 
     @discord_commands.command(pass_context=True)
     async def channels(self, ctx):
@@ -195,16 +158,7 @@ class SiriusXMBotCog:
             return False
 
         summoned_channel = author.voice.channel
-        if self._state.voice is None:
-            self._log.debug(
-                f'connecting to new voice channel: {summoned_channel.id}')
-            self._state.voice = await summoned_channel.connect()
-        else:
-            self._log.debug(
-                f'moving to voice channel: {summoned_channel.id}')
-            await self._state.voice.move_to(summoned_channel)
-
-        return True
+        await self._state.player.set_voice(summoned_channel)
 
     @discord_commands.command(pass_context=True, no_pm=True)
     async def volume(self, ctx, amount: float = None):
@@ -213,32 +167,21 @@ class SiriusXMBotCog:
         channel = ctx.message.channel
         author = ctx.message.author
 
-        if not self._state.is_playing:
+        if not self._state.player.is_playing:
             self._log.debug('volume: nothing is playing')
             await channel.send(
                 f'{author.mention}, cannot get/set the volume. '
                 f'Nothing is playing'
             )
         elif amount is None:
-            self._log.debug(
-                f'volume: {self._state.source.volume}')
             await channel.send(
                 f'{author.mention}, volume is currently '
-                f'{self._state.source.volume}'
-            )
-        elif amount < 0.0 or amount > 1.0:
-            self._log.debug(
-                f'volume: invalid amount')
-            await channel.send(
-                f'{author.mention}, invalid volume amount. Must be between '
-                f'0.0 and 1.0 (1.0 = 100% max volume)'
+                f'{self._state.player.volume}'
             )
         else:
-            self._log.debug(
-                f'volume: set {amount}')
-            self._state.source.volume = amount
+            self._state.player.volume = amount
             await channel.send(
-                f'{author.mention}, set volume to {amount}')
+                f'{author.mention}, set volume to {self._state.player.volume}')
 
     @discord_commands.command(pass_context=True, no_pm=True)
     async def stop(self, ctx):
@@ -248,11 +191,8 @@ class SiriusXMBotCog:
         channel = ctx.message.channel
         author = ctx.message.author
 
-        if self._state.is_playing:
-            self._state.source.cleanup()
-            await self._state.voice.disconnect()
-            self._state.source = None
-            self._state.voice = None
+        if self._state.player.is_playing:
+            await self._state.player.stop()
             self._state.xm_state.reset_channel()
 
             self._log.debug('stop: stopped')
@@ -269,24 +209,22 @@ class SiriusXMBotCog:
         channel = ctx.message.channel
         author = ctx.message.author
 
-        if self._state.voice is None:
-            self._log.debug('kick: nothing')
+        if author.voice is None:
+            self._log.debug('kick: no room')
             await channel.send(
-                f'{author.mention}, cannot kick. Not in a voice channel')
-        elif author.voice is None or \
-                self._state.voice.channel.id != author.voice.channel.id:
-            self._log.debug('kick: invalid room')
-            await channel.send(
-                f'{author.mention}, cannot kick. Not in your voice channel')
-        elif self._state.is_playing:
-            await ctx.invoke(self.stop)
+                f'{author.mention}, nothing to kick. '
+                f'You are not in a voice channel'
+            )
         else:
-            self._log.debug(f'kick: {self._state.voice.channel.id}')
-            await self._state.voice.disconnect()
-            self._state.voice = None
+            success = await self._state.player.kick(author.voice.channel)
+            if not success:
+                await channel.send(
+                    f'{author.mention}, cannot kick. '
+                    f'Are you sure I am in the same voice channel as you?'
+                )
 
     @discord_commands.command(pass_context=True, no_pm=True)
-    async def play(self, ctx, *, channel_id: str = None):
+    async def channel(self, ctx, *, channel_id: str = None):
         """Plays a specific SiriusXM channel"""
         channel = ctx.message.channel
         author = ctx.message.author
@@ -297,41 +235,59 @@ class SiriusXMBotCog:
             return
 
         xm_channel = self._state.xm_state.get_channel(channel_id)
+        xm_url = f'{self._proxy_base}/{xm_channel.id}.m3u8'
         if xm_channel is None:
             self._log.debug('play: invalid')
             await channel.send(f'{author.mention}, `{channel_id}` is invalid')
             return
 
-        if not self._state.is_playing:
+        if self._state.player.is_playing:
+            await self._state.player.stop(disconnect=False)
+            await asyncio.sleep(0.5)
+        else:
             await ctx.invoke(self.summon)
 
-        success = await self.play_channel(xm_channel)
+        stream_file = None
+        log_archive = ''
+        if self._output_folder is not None:
+            log_archive = f': archiving'
+            stream_file = os.path.join(
+                self._output_folder, f'{xm_channel.id}.mp3')
 
-        if success:
+            if os.path.exists(stream_file):
+                os.remove(stream_file)
+
+        try:
+            self._log.info(f'play{log_archive}: {xm_channel.id}')
+            source = FFmpegPCMAudio(
+                xm_url,
+                before_options='-f hls',
+                after_options=stream_file,
+            )
+            await self._state.player.add(None, source)
+        except Exception as e:
+            self._log.error(f'{type(e).__name__}: {e}')
+            await self._state.player.stop()
+            await channel.send(
+                f'{author.mention}, something went wrong starting stream')
+        else:
+            self._state.xm_state.set_channel(xm_channel.id)
             await channel.send(
                 f'{author.mention} starting playing '
                 f'**{xm_channel.pretty_name}** in '
                 f'**{author.voice.channel.mention}**'
             )
-        else:
-            await channel.send(
-                f'{author.mention}, something went wrong starting stream')
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def np(self, ctx):
-        """Responds with what the bot currently playing"""
+    async def _sxm_now_playing(self, ctx):
         channel = ctx.message.channel
         author = ctx.message.author
 
-        if not self._state.is_playing:
-            self._log.debug('np: nothing')
-            await channel.send(f'{author.mention}, nothing is playing')
-            return
-
         xm_channel = self._state.xm_state.get_channel(
             self._state.xm_state.active_channel_id)
-        cut = self._state.xm_state.live.get_latest_cut()
-        episode = self._state.xm_state.live.get_latest_episode()
+        cut = self._state.xm_state.live.get_latest_cut(
+            now=self._state.xm_state.radio_time)
+        episode = self._state.xm_state.live.get_latest_episode(
+            now=self._state.xm_state.radio_time)
 
         np_title = None
         np_author = None
@@ -380,9 +336,267 @@ class SiriusXMBotCog:
         embed.add_field(
             name="SiriusXM", value=xm_channel.pretty_name, inline=True)
         if np_episode_title is not None:
-            embed.add_field(name="Show", value=np_episode_title, inline=True)
+            embed.add_field(
+                name="Show", value=np_episode_title, inline=True)
 
         await channel.send(author.mention, embed=embed)
+
+    @discord_commands.command(pass_context=True, no_pm=True)
+    async def playing(self, ctx):
+        """Responds with what the bot currently playing"""
+        channel = ctx.message.channel
+        author = ctx.message.author
+
+        if not self._state.player.is_playing:
+            self._log.debug('np: nothing')
+            await channel.send(f'{author.mention}, nothing is playing')
+            return
+
+        if self._state.xm_state.active_channel_id is not None:
+            await self._sxm_now_playing(ctx)
+        else:
+            await channel.send(
+                f'{author.mention}, current playing is '
+                f'{self._state.player.current.bold_name}'
+            )
+
+    async def _sxm_recent(self, ctx, count):
+        channel = ctx.message.channel
+        author = ctx.message.author
+
+        xm_channel = self._state.xm_state.get_channel(
+            self._state.xm_state.active_channel_id)
+
+        song_cuts = []
+        now = self._state.xm_state.radio_time
+        latest_cut = self._state.xm_state.live.get_latest_cut(now)
+
+        for song_cut in reversed(self._state.xm_state.live.song_cuts):
+            if song_cut == latest_cut:
+                song_cuts.append(song_cut)
+                continue
+
+            end = int(song_cut.time + song_cut.duration)
+            if song_cut.time < now and \
+                    (end > self._state.xm_state.start_time or
+                        song_cut.time > self._state.xm_state.start_time):
+                song_cuts.append(song_cut)
+
+            if len(song_cuts) >= count:
+                break
+
+        if len(song_cuts) > 0:
+            message = (
+                f'{author.mention}\n\n'
+                f'Recent songs for **{xm_channel.pretty_name}**:\n\n'
+            )
+
+            for song_cut in song_cuts:
+                seconds_ago = int((now-song_cut.time)/1000)
+                time_delta = datetime.timedelta(seconds=seconds_ago)
+                time_string = humanize.naturaltime(time_delta)
+
+                pretty_name = Song.get_pretty_name(
+                    song_cut.cut.title,
+                    song_cut.cut.artists[0].name,
+                    True
+                )
+                if song_cut == latest_cut:
+                    message += f'now: {pretty_name}\n'
+                else:
+                    message += f'about {time_string}: {pretty_name}\n'
+
+            await channel.send(message)
+        else:
+            await channel.send(
+                f'{author.mention}, no recent songs played'
+            )
+
+    @discord_commands.command(pass_context=True, no_pm=True)
+    async def recent(self, ctx, count: int = 3):
+        """Responds with the last 1-10 songs that been
+        played on this channel"""
+        channel = ctx.message.channel
+        author = ctx.message.author
+
+        if not self._state.player.is_playing:
+            self._log.debug('recent: nothing')
+            await channel.send(f'{author.mention}, nothing is playing')
+            return
+
+        if count > 10 or count < 1:
+            self._log.debug('recent: invalid count')
+            await channel.send(
+                f'{author.mention}, invalid count, must be between 1 and 1, '
+                f'exclusive'
+            )
+            return
+
+        if self._state.xm_state.active_channel_id is not None:
+            await self._sxm_recent(ctx, count)
+        else:
+            message = (
+                f'{author.mention}\n\n'
+                f'Recent songs/shows:\n\n'
+            )
+
+            index = 0
+            for item in self._state.player.recent[:count]:
+                if item == self._state.player.current:
+                    message += f'now: {item.bold_name}\n'
+                else:
+                    message += f'{index}: {item.bold_name}\n'
+                index -= 1
+
+            await channel.send(message)
+
+    def _get_db(self):
+        return init_db(os.path.join(self._output_folder, '..', 'processed'))
+
+    async def _search_archive(self, ctx, search, is_song):
+        channel = ctx.message.channel
+        author = ctx.message.author
+        db = self._get_db()
+        search_type = 'shows'
+        if is_song:
+            search_type = 'songs'
+
+        if search is None:
+            self._log.debug(f'{search_type}: nothing')
+            await channel.send(
+                f'{author.mention}, please provide a search string '
+                f'to find a song'
+            )
+            return
+
+        items = None
+        if is_song:
+            items = db.query(Song).filter(or_(
+                Song.guid.ilike(f'{search}%'),
+                Song.title.ilike(f'{search}%'),
+                Song.artist.ilike(f'{search}%'),
+            )).order_by(Song.air_time.desc())[:10]
+        else:
+            items = db.query(Episode).filter(or_(
+                Episode.guid.ilike(f'{search}%'),
+                Episode.title.ilike(f'{search}%'),
+                Episode.show.ilike(f'{search}%')
+            )).order_by(Episode.air_time.desc())[:10]
+
+        if len(items) > 0:
+            message = (
+                f'{author.mention}\n\n'
+                f'{search_type.title()} matching `{search}`:\n\n'
+            )
+            for item in items:
+                message += f'{item.guid}: {item.bold_name}\n'
+
+            await channel.send(message)
+        else:
+            await channel.send(
+                f'{author.mention}, no {search_type} results '
+                f'found for `{search}`'
+            )
+
+    @discord_commands.command(pass_context=True, no_pm=True)
+    async def songs(self, ctx, search: str = None):
+        """Searches for an archived song to play.
+        Only returns the first 10 songs"""
+
+        await self._search_archive(ctx, search, True)
+
+    @discord_commands.command(pass_context=True, no_pm=True)
+    async def shows(self, ctx, search: str = None):
+        """Searches for an archived show to play.
+        Only returns the first 10 shows"""
+
+        await self._search_archive(ctx, search, False)
+
+    @discord_commands.command(pass_context=True, no_pm=True)
+    async def song(self, ctx, song_id: str = None):
+        """Adds a song to a play queue"""
+
+        await self._play_file(ctx, song_id, True)
+
+    @discord_commands.command(pass_context=True, no_pm=True)
+    async def show(self, ctx, show_id: str = None):
+        """Adds a show to a play queue"""
+
+        await self._play_file(ctx, show_id, False)
+
+    async def _play_file(self, ctx, guid, is_song):
+        channel = ctx.message.channel
+        author = ctx.message.author
+        db = self._get_db()
+        search_type = 'shows'
+        if is_song:
+            search_type = 'songs'
+
+        if guid is None:
+            self._log.debug(f'{search_type}: nothing')
+            await channel.send(
+                f'{author.mention}, please provide a {search_type} id'
+            )
+            return
+
+        if not self._state.player.is_playing:
+            await ctx.invoke(self.summon)
+
+        if self._state.xm_state.active_channel_id is not None:
+            self._state.xm_state.reset_channel()
+            await self._state.player.stop(disconnect=False)
+            await asyncio.sleep(0.5)
+
+        db_item = None
+        if is_song:
+            db_item = db.query(Song).filter_by(guid=guid).first()
+        else:
+            db_item = db.query(Episode).filter_by(guid=guid).first()
+
+        if db_item is not None and not os.path.exists(db_item.file_path):
+            self._log.warn(f'file does not exist: {db_item.file_path}')
+            db_item = None
+
+        if db_item is None:
+            await channel.send(
+                f'{author.mention}, invalid {search_type} id'
+            )
+
+        try:
+            self._log.info(f'play: {db_item.file_path}')
+            source = FFmpegPCMAudio(
+                db_item.file_path,
+            )
+            await self._state.player.add(db_item, source)
+        except Exception as e:
+            self._log.error(f'{type(e).__name__}: {e}')
+        else:
+            await channel.send(
+                    f'{author.mention}, added {db_item.bold_name} '
+                    f'to now playing queue'
+                )
+
+    @discord_commands.command(pass_context=True, no_pm=True)
+    async def skip(self, ctx):
+        """Skips current song (only for ad-hoc, not SiriusXM radio)"""
+        channel = ctx.message.channel
+        author = ctx.message.author
+
+        if not self._state.player.is_playing:
+            await channel.send(
+                f'{author.mention}, cannot skip. '
+                f'Nothing is playing'
+            )
+            return
+
+        if self._state.xm_state.active_channel_id is not None:
+            await channel.send(
+                f'{author.mention}, cannot skip. '
+                f'SiriusXM radio is playing'
+            )
+            return
+
+        await self._state.player.skip()
 
 
 def run_bot(prefix, description, state, token, port, output_folder):
@@ -392,6 +606,13 @@ def run_bot(prefix, description, state, token, port, output_folder):
         pm_help=True
     )
     bot.add_cog(SiriusXMBotCog(bot, state, port, output_folder))
+
+    if output_folder is None:
+        bot.remove_command('songs')
+        # bot.remove_command('song')
+        bot.remove_command('shows')
+        # bot.remove_command('show')
+
     logger = logging.getLogger('discord_siriusxm.bot')
 
     @bot.event

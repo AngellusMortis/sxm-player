@@ -8,7 +8,6 @@ from .utils import get_files, splice_file
 
 ARCHIVE_CHUNK = 600
 ARCHIVE_BUFFER = 5
-MAX_ARCHIVE_TIME = 14400  # 4 hours
 
 logger = logging.getLogger('discord_siriusxm.archiver')
 
@@ -24,9 +23,13 @@ def delete_old_archives(archive_folder, archive_base, ignored_file):
             os.remove(abs_path)
 
 
-def process_stream_file(abs_path, channel_id, archive_folder) -> str:
+def process_stream_file(abs_path, state, channel_id, archive_folder) -> str:
     max_archive_cutoff = int(time.time()) - ARCHIVE_BUFFER
     creation_time = int(os.path.getatime(abs_path)) + ARCHIVE_BUFFER
+
+    # not reliable enough yet
+    # max_archive_cutoff = int(state.radio_time / 1000) - ARCHIVE_BUFFER
+    # creation_time = int(state.start_time / 1000) + ARCHIVE_BUFFER
 
     time_elapsed = max_archive_cutoff - creation_time
     archive_chunks = int(time_elapsed / ARCHIVE_CHUNK)
@@ -83,7 +86,9 @@ def run_archiver(state, output_folder):
                 else:
                     state.processing_file = True
                     archived = process_stream_file(
-                        abs_path, active_channel_id, channel_archive)
+                        abs_path, state,
+                        active_channel_id, channel_archive
+                    )
                     state.processing_file = False
 
             logger.info(
