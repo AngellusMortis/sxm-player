@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import logging
 import os
-import time
+from dataclasses import dataclass
 
 import discord
 import humanize
@@ -12,52 +12,22 @@ from tabulate import tabulate
 from sqlalchemy import or_
 from sxm.models import XMImage, XMSong
 
-from .models import BotState, Episode, Song
-from .player import FFmpegPCMAudio
+from .models import Episode, LiveStreamInfo, Song, XMState
+from .player import AudioPlayer
 from .processor import init_db
 
 
-class SiriusXMActivity(discord.Game):
-    def __init__(self, start, radio_time, channel, live_channel, **kwargs):
-        self.timestamps = {'start': start}
-        self._start = start
-        self.details = 'Test'
+@dataclass
+class BotState:
+    """Class to store the state for Discord bot"""
+    xm_state: XMState = None
+    player: AudioPlayer = None
+    _bot: discord_commands.Bot = None
 
-        self.assets = kwargs.pop('assets', {})
-        self.party = kwargs.pop('party', {})
-        self.application_id = kwargs.pop('application_id', None)
-        self.url = kwargs.pop('url', None)
-        self.flags = kwargs.pop('flags', 0)
-        self.sync_id = kwargs.pop('sync_id', None)
-        self.session_id = kwargs.pop('session_id', None)
-        self._end = 0
-
-        self.update_status(channel, live_channel, radio_time)
-
-    def update_status(self, channel, live_channel, radio_time):
-        self.state = "Playing music from SiriusXM"
-        self.name = f'SiriusXM {channel.pretty_name}'
-        self.large_image_url = None
-        self.large_image_text = None
-
-        latest_cut = live_channel.get_latest_cut(now=radio_time)
-        if latest_cut is not None and isinstance(latest_cut.cut, XMSong):
-            song = latest_cut.cut
-            pretty_name = Song.get_pretty_name(
-                song.title, song.artists[0].name)
-            self.name = (
-                f'{pretty_name} on {self.name}')
-
-            if song.album is not None:
-                album = song.album
-                if album.title is not None:
-                    self.large_image_text = (
-                        f'{album.title} by {song.artists[0].name}')
-
-                for art in album.arts:
-                    if isinstance(art, XMImage):
-                        if art.size is not None and art.size == 'MEDIUM':
-                            self.large_image_url = art.url
+    def __init__(self, state_dict, bot):
+        self._bot = bot
+        self.xm_state = XMState(state_dict)
+        self.player = AudioPlayer(bot, self.xm_state)
 
 
 class SiriusXMBotCog:
@@ -79,42 +49,10 @@ class SiriusXMBotCog:
         if self._output_folder is not None:
             self._output_folder = os.path.join(self._output_folder, 'streams')
 
-        self._bot.loop.create_task(self.status_update())
-
     def __unload(self):
         if self._state.player is not None:
             self._bot.loop.create_task(self._state.player.stop())
         self._state.xm_state.reset_channel()
-
-    async def status_update(self):
-        await self._bot.wait_until_ready()
-
-        sleep_time = 10
-        while not self._bot.is_closed():
-            await asyncio.sleep(sleep_time)
-            sleep_time = 5
-
-            activity = None
-            if self._state.player.is_playing:
-                if self._state.xm_state.active_channel_id is not None:
-                    xm_channel = self._state.xm_state.get_channel(
-                        self._state.xm_state.active_channel_id)
-
-                    if self._state.xm_state.live is not None:
-                        self._log.debug('status update: SiriusXM')
-                        activity = SiriusXMActivity(
-                            start=self._state.xm_state.start_time,
-                            radio_time=self._state.xm_state.radio_time,
-                            channel=xm_channel,
-                            live_channel=self._state.xm_state.live,
-                        )
-                elif self._state.player.current is not None:
-                    self._log.debug(
-                        f'status update: {self._state.player.current}')
-                    activity = discord.Game(
-                        name=self._state.player.current.pretty_name)
-
-            await self._bot.change_presence(activity=activity)
 
     @discord_commands.command(pass_context=True)
     async def channels(self, ctx):
@@ -257,15 +195,10 @@ class SiriusXMBotCog:
             if os.path.exists(stream_file):
                 os.remove(stream_file)
 
+        live_stream = LiveStreamInfo(stream_file, xm_url, xm_channel)
         try:
             self._log.info(f'play{log_archive}: {xm_channel.id}')
-            source = FFmpegPCMAudio(
-                xm_url,
-                before_options='-f hls',
-                after_options=stream_file,
-            )
-            stream_file = None
-            await self._state.player.add(None, source, stream_file)
+            await self._state.player.add_live_stream(live_stream)
         except Exception as e:
             self._log.error(f'{type(e).__name__}: {e}')
             await self._state.player.stop()
@@ -565,10 +498,7 @@ class SiriusXMBotCog:
 
         try:
             self._log.info(f'play: {db_item.file_path}')
-            source = FFmpegPCMAudio(
-                db_item.file_path,
-            )
-            await self._state.player.add(db_item, source)
+            await self._state.player.add_file(db_item)
         except Exception as e:
             self._log.error(f'{type(e).__name__}: {e}')
         else:

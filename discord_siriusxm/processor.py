@@ -155,8 +155,6 @@ def process_cut(archives, db, cut, output_folder,
 
 
 def process_cuts(archives, db, output_folder, channel_id, cuts, is_song=True):
-    logger.warn(f'processing: {len(cuts)}: {is_song}')
-
     processed = 0
     for cut in cuts:
         if cut.duration == 0.0:
@@ -186,7 +184,7 @@ def process_cuts(archives, db, output_folder, channel_id, cuts, is_song=True):
             title = cut.episode.long_title or \
                 cut.episode.medium_title
 
-        logger.warn(
+        logger.debug(
             f'processing {title}: '
             f'{cut.time}: {cut.duration}'
             f'{cut.guid}'
@@ -211,7 +209,7 @@ def run_processor(state, output_folder, reset_songs):
 
     db = init_db(processed_folder, True, reset_songs)
 
-    logger.warn(f'processor started: {output_folder}')
+    logger.info(f'processor started: {output_folder}')
     sleep_time = 10
     while True:
         time.sleep(sleep_time)
@@ -253,7 +251,7 @@ def run_processor(state, output_folder, reset_songs):
                 is_song=False
             )
 
-            logger.warn(
+            logger.info(
                 f'processed: {processed_songs} songs, {processed_shows} shows')
         except Exception as e:
             logger.error(f'error occurred in processor loop: {e}')

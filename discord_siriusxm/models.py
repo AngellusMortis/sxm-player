@@ -1,18 +1,13 @@
-import asyncio
 import threading
 import time
-from dataclasses import dataclass
 from typing import List
 
 import discord
-from discord.ext import commands as discord_commands
-from discord.player import AudioPlayer as DiscordAudioPlayer
 
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
-from sxm.models import XMChannel, XMLiveChannel
+from sxm.models import XMChannel, XMImage, XMLiveChannel, XMSong
 
-from .player import FFmpegPCMAudio
 
 Base = declarative_base()
 
@@ -37,15 +32,26 @@ class DictState:
         super().__setattr__(attr, value)
 
 
+class LiveStreamInfo:
+    archive_file: str = None
+    stream_url: str = None
+    channel: XMChannel = None
+
+    def __init__(self, archive_file, stream_url, channel):
+        self.archive_file = archive_file
+        self.stream_url = stream_url
+        self.channel = channel
+
+
 class QueuedItem:
     item = None
     source: discord.AudioSource = None
-    live_stream_file: str = None
+    live: LiveStreamInfo = None
 
-    def __init__(self, item, source, live_stream_file=None):
+    def __init__(self, item, source, live=None):
         self.item = item
         self.source = source
-        self.live_stream_file = live_stream_file
+        self.live = live
 
 
 class FakeClient:
@@ -59,142 +65,47 @@ class FakeClient:
         pass
 
 
-class AudioPlayer:
-    _current: discord.AudioSource = None
-    _voice: discord.VoiceClient = None
-    _task = None
-    _queue: asyncio.Queue = asyncio.Queue()
-    _event: asyncio.Event = asyncio.Event()
-    _bot: discord_commands.Bot = None
+class SiriusXMActivity(discord.Game):
+    def __init__(self, start, radio_time, channel, live_channel, **kwargs):
+        self.timestamps = {'start': start}
+        self._start = start
+        self.details = 'Test'
 
-    _live_source: discord.AudioSource = None
-    _live_player: DiscordAudioPlayer = None
+        self.assets = kwargs.pop('assets', {})
+        self.party = kwargs.pop('party', {})
+        self.application_id = kwargs.pop('application_id', None)
+        self.url = kwargs.pop('url', None)
+        self.flags = kwargs.pop('flags', 0)
+        self.sync_id = kwargs.pop('sync_id', None)
+        self.session_id = kwargs.pop('session_id', None)
+        self._end = 0
 
-    recent = None
+        self.update_status(channel, live_channel, radio_time)
 
-    _volume: float = 0.5
+    def update_status(self, channel, live_channel, radio_time):
+        self.state = "Playing music from SiriusXM"
+        self.name = f'SiriusXM {channel.pretty_name}'
+        self.large_image_url = None
+        self.large_image_text = None
 
-    def __init__(self, bot):
-        self._bot = bot
-        self.recent = []
+        latest_cut = live_channel.get_latest_cut(now=radio_time)
+        if latest_cut is not None and isinstance(latest_cut.cut, XMSong):
+            song = latest_cut.cut
+            pretty_name = Song.get_pretty_name(
+                song.title, song.artists[0].name)
+            self.name = (
+                f'{pretty_name} on {self.name}')
 
-    @property
-    def is_playing(self):
-        if self._voice is None or self._voice is None:
-            return False
+            if song.album is not None:
+                album = song.album
+                if album.title is not None:
+                    self.large_image_text = (
+                        f'{album.title} by {song.artists[0].name}')
 
-        return self._voice.is_playing()
-
-    async def set_voice(self, channel):
-        if self._voice is None:
-            self._voice = await channel.connect()
-            self._task = self._bot.loop.create_task(self._audio_player())
-        else:
-            await self._voice.move_to(channel)
-
-    @property
-    def volume(self):
-        return self._volume
-
-    @property
-    def current(self):
-        if self._current is not None:
-            return self._current.item
-        return None
-
-    @volume.setter
-    def volume(self, volume) -> bool:
-        if volume < 0.0:
-            volume = 0.0
-        elif volume > 1.0:
-            volume = 1.0
-
-        self._volume = volume
-        if self._current is not None:
-            self._current.volume = self._volume
-
-    async def stop(self, disconnect=True):
-        if self._current is not None:
-            self._current.source.cleanup()
-            self._current = None
-
-        self.recent = []
-        if self._live_source is not None:
-            self._live_source.cleanup()
-            self._live_source = None
-
-        if self._live_player is not None:
-            self._live_player = None
-
-        if self._voice is not None:
-            if self._voice.is_playing():
-                self._voice.stop()
-            if disconnect:
-                if self._task is not None:
-                    self._task.cancel()
-                self._song_end()
-                await self._voice.disconnect()
-                self._voice = None
-
-    async def kick(self, channel) -> bool:
-        if self._voice is None:
-            return False
-
-        if self._voice.channel.id == channel.id:
-            await self.stop()
-            return True
-        return False
-
-    async def skip(self) -> bool:
-        if self._voice is not None:
-            if self._queue.qsize() < 1:
-                await self.stop()
-            else:
-                self._voice.stop()
-            return True
-        return False
-
-    async def add(self, db_item, source, live_stream_file=False):
-        if self._voice is None:
-            raise discord.DiscordException('Voice client is not set')
-
-        item = QueuedItem(db_item, source, live_stream_file)
-        await self._queue.put(item)
-
-    def _song_end(self, error=None):
-        self._bot.loop.call_soon_threadsafe(self._event.set)
-
-    async def _audio_player(self):
-        import logging
-        logger = logging.getLogger('test')
-
-        while True:
-            self._event.clear()
-            self._current = await self._queue.get()
-
-            self.recent.insert(0, self._current.item)
-            self.recent = self.recent[:10]
-
-            if self._current.live_stream_file is not None:
-                try:
-                    self._live_source = self._current.source
-                    self._live_player = DiscordAudioPlayer(
-                        self._live_source, FakeClient(), after=self._song_end)
-                    self._live_player.start()
-                    await asyncio.sleep(10)
-
-                    self._current.source = FFmpegPCMAudio(
-                        self._current.live_stream_file,
-                    )
-                except Exception as e:
-                    logger.error(f'{type(e).__name__}: {e}')
-
-            self._current.source = discord.PCMVolumeTransformer(
-                self._current.source, volume=self._volume)
-            self._voice.play(self._current.source, after=self._song_end)
-
-            await self._event.wait()
-            self._current = None
+                for art in album.arts:
+                    if isinstance(art, XMImage):
+                        if art.size is not None and art.size == 'MEDIUM':
+                            self.large_image_url = art.url
 
 
 class XMState(DictState):
@@ -285,19 +196,6 @@ class XMState(DictState):
     def reset_channel(self):
         self.active_channel_id = None
         self.live = None
-
-
-@dataclass
-class BotState:
-    """Class to store the state for Discord bot"""
-    xm_state: XMState = None
-    player: AudioPlayer = None
-    _bot: discord_commands.Bot = None
-
-    def __init__(self, state_dict, bot):
-        self._bot = bot
-        self.xm_state = XMState(state_dict)
-        self.player = AudioPlayer(bot)
 
 
 class Song(Base):
