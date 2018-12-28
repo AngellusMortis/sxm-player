@@ -264,7 +264,8 @@ class SiriusXMBotCog:
                 before_options='-f hls',
                 after_options=stream_file,
             )
-            await self._state.player.add(None, source)
+            stream_file = None
+            await self._state.player.add(None, source, stream_file)
         except Exception as e:
             self._log.error(f'{type(e).__name__}: {e}')
             await self._state.player.stop()

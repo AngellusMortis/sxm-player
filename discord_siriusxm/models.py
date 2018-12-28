@@ -1,14 +1,18 @@
 import asyncio
+import threading
 import time
 from dataclasses import dataclass
 from typing import List
 
 import discord
 from discord.ext import commands as discord_commands
+from discord.player import AudioPlayer as DiscordAudioPlayer
 
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
 from sxm.models import XMChannel, XMLiveChannel
+
+from .player import FFmpegPCMAudio
 
 Base = declarative_base()
 
@@ -35,11 +39,24 @@ class DictState:
 
 class QueuedItem:
     item = None
-    source = None
+    source: discord.AudioSource = None
+    live_stream_file: str = None
 
-    def __init__(self, item, source):
+    def __init__(self, item, source, live_stream_file=None):
         self.item = item
         self.source = source
+        self.live_stream_file = live_stream_file
+
+
+class FakeClient:
+    _connected = None
+
+    def __init__(self):
+        self._connected = threading.Event()
+        self._connected.set()
+
+    def send_audio_packet(self, data, *, encode=True):
+        pass
 
 
 class AudioPlayer:
@@ -49,6 +66,9 @@ class AudioPlayer:
     _queue: asyncio.Queue = asyncio.Queue()
     _event: asyncio.Event = asyncio.Event()
     _bot: discord_commands.Bot = None
+
+    _live_source: discord.AudioSource = None
+    _live_player: DiscordAudioPlayer = None
 
     recent = None
 
@@ -99,6 +119,12 @@ class AudioPlayer:
             self._current = None
 
         self.recent = []
+        if self._live_source is not None:
+            self._live_source.cleanup()
+            self._live_source = None
+
+        if self._live_player is not None:
+            self._live_player = None
 
         if self._voice is not None:
             if self._voice.is_playing():
@@ -128,23 +154,40 @@ class AudioPlayer:
             return True
         return False
 
-    async def add(self, db_item, source):
+    async def add(self, db_item, source, live_stream_file=False):
         if self._voice is None:
             raise discord.DiscordException('Voice client is not set')
 
-        item = QueuedItem(db_item, source)
+        item = QueuedItem(db_item, source, live_stream_file)
         await self._queue.put(item)
 
     def _song_end(self, error=None):
         self._bot.loop.call_soon_threadsafe(self._event.set)
 
     async def _audio_player(self):
+        import logging
+        logger = logging.getLogger('test')
+
         while True:
             self._event.clear()
             self._current = await self._queue.get()
 
             self.recent.insert(0, self._current.item)
             self.recent = self.recent[:10]
+
+            if self._current.live_stream_file is not None:
+                try:
+                    self._live_source = self._current.source
+                    self._live_player = DiscordAudioPlayer(
+                        self._live_source, FakeClient(), after=self._song_end)
+                    self._live_player.start()
+                    await asyncio.sleep(10)
+
+                    self._current.source = FFmpegPCMAudio(
+                        self._current.live_stream_file,
+                    )
+                except Exception as e:
+                    logger.error(f'{type(e).__name__}: {e}')
 
             self._current.source = discord.PCMVolumeTransformer(
                 self._current.source, volume=self._volume)

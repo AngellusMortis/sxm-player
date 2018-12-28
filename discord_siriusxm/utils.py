@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import subprocess
@@ -8,6 +9,14 @@ from pydub.silence import split_on_silence
 TRIM_VARIANCE = 0.05
 
 logger = logging.getLogger('discord_siriusxm.utils')
+
+
+def get_air_time(cut):
+    air_time = datetime.datetime.fromtimestamp(
+        int(cut.time/1000), tz=datetime.timezone.utc)
+    air_time = air_time.replace(minute=0, second=0, microsecond=0)
+
+    return air_time
 
 
 def get_files(folder):

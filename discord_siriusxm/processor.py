@@ -1,4 +1,3 @@
-import datetime
 import logging
 import os
 import time
@@ -7,9 +6,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import Base, Episode, Song, XMState
-from .utils import get_files, splice_file
+from .utils import get_files, splice_file, get_air_time
 
 logger = logging.getLogger('discord_siriusxm.processor')
+
+MAX_DUPLICATE_COUNT = 3
 
 
 def init_db(base_folder, cleanup=True, reset=False):
@@ -77,9 +78,7 @@ def process_cut(archives, db, cut, output_folder,
         filename = None
         folder = None
 
-        air_time = datetime.datetime.fromtimestamp(
-            int(cut.time/1000), tz=datetime.timezone.utc)
-        air_time = air_time.replace(minute=0, second=0, microsecond=0)
+        air_time = get_air_time(cut)
 
         if is_song:
             title = path_filter(cut.cut.title)
@@ -157,6 +156,14 @@ def process_cuts(archives, db, output_folder, channel_id, cuts, is_song=True):
 
         db_item = None
         if is_song:
+            existing = db.query(Song).filter_by(
+                title=cut.cut.title,
+                artist=cut.cut.artists[0].name
+            ).all()
+
+            if len(existing) >= MAX_DUPLICATE_COUNT:
+                continue
+
             db_item = db.query(Song).filter_by(guid=cut.guid).first()
         else:
             db_item = db.query(Episode).filter_by(guid=cut.guid).first()
