@@ -45,16 +45,20 @@ class SiriusXMProxyServer:
                 self._state.live = data
         return update_handler
 
-    def run(self):
+    def run(self, log_level=logging.WARN):
         app = make_async_http_app(self._xm)
 
         self._log.info(
             f'running SiriusXM proxy server on http://{self._ip}:{self._port}'
         )
+
+        request_logger = logging.getLogger('discord_siriusxm.server.request')
+        request_logger.setLevel(log_level)
+
         try:
             web.run_app(
                 app,
-                access_log=logging.getLogger('discord_siriusxm.server.request'),
+                access_log=request_logger,
                 print=None,
                 host=self._ip,
                 port=self._port
@@ -65,6 +69,6 @@ class SiriusXMProxyServer:
             raise(e)
 
 
-def run_server(state, port, ip, username, password):
+def run_server(state, port, ip, username, password, log_level):
     server = SiriusXMProxyServer(state, port, ip, username, password)
-    server.run()
+    server.run(log_level=log_level)

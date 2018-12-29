@@ -40,6 +40,8 @@ def splice_file(input_file, output_file, start_time, end_time) -> str:
         output_file
     ]
 
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
     try:
         subprocess.run(args, check=True)
     except subprocess.CalledProcessError as e:

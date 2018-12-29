@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """Console script for discord_siriusxm."""
+import logging
 import signal
 import sys
 from multiprocessing import Manager, Pool
@@ -36,11 +37,24 @@ from .server import run_server
               help='output folder to save stream off to as it plays them')
 @click.option('-r', '--reset-songs', is_flag=True,
               help='reset processed song database')
+@click.option('-v', is_flag=True,
+              help='enable verbose logging (shows HTTP requests)')
+@click.option('-vv', is_flag=True,
+              help='enable debug logging')
 def main(username, password, token, prefix, description,
-         port, host, output_folder, reset_songs):
+         port, host, output_folder, reset_songs, v, vv):
     """Command line interface for SiriusXM radio bot for Discord"""
 
-    coloredlogs.install(level='INFO')
+    level = 'INFO'
+    request_level = logging.WARN
+
+    if vv:
+        level = 'DEBUG'
+        request_level = logging.DEBUG
+    elif v:
+        request_level = logging.INFO
+
+    coloredlogs.install(level=level)
 
     with Manager() as manager:
         state = manager.dict()
@@ -65,7 +79,8 @@ def main(username, password, token, prefix, description,
 
                 pool.apply_async(
                     func=run_server,
-                    args=(state, port, host, username, password))
+                    args=(state, port, host, username, password, request_level)
+                )
                 pool.apply(
                     func=run_bot,
                     args=(prefix, description, state, token, port, output_folder)
