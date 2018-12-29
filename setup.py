@@ -52,7 +52,7 @@ setup(
     install_requires=requirements,
     dependency_links=[
         'https://github.com/Rapptz/discord.py/tarball/rewrite#egg=discord.py-1.0.0a0',
-        'https://github.com/AngellusMortis/SiriusXM/tarball/feature/data-models#egg=sxm-0.1.0',
+        'https://github.com/AngellusMortis/SiriusXM/tarball/feature/improvements#egg=sxm-0.1.0',
     ],
     license="MIT license",
     long_description=readme + '\n\n' + history,
