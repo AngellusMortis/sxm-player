@@ -168,6 +168,11 @@ class SiriusXMBotCog:
         channel = ctx.message.channel
         author = ctx.message.author
 
+        if author.voice is None:
+            self._log.debug('play: no channel')
+            await channel.send(f'{author.mention}, you are not in a voice channel.')
+            return
+
         if channel_id is None:
             self._log.debug('play: missing')
             await channel.send(f'{author.mention}, missing channel id.')
@@ -467,6 +472,11 @@ class SiriusXMBotCog:
         search_type = 'shows'
         if is_song:
             search_type = 'songs'
+
+        if author.voice is None:
+            self._log.debug('play: no channel')
+            await channel.send(f'{author.mention}, you are not in a voice channel.')
+            return
 
         if guid is None:
             self._log.debug(f'{search_type}: nothing')

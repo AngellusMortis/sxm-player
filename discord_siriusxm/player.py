@@ -327,9 +327,6 @@ class AudioPlayer:
             before_options='-f hls',
             after_options=live_stream.archive_file,
         )
-        self._log.warn(live_stream.stream_url)
-        self._log.warn(live_stream.archive_file)
-        self._log.warn(live_stream.channel.id)
         await self._add(None, source, live_stream)
 
     async def add_file(self, file_info):
