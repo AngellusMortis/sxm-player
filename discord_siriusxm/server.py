@@ -16,8 +16,9 @@ class SiriusXMProxyServer:
     _xm = None
     _state = None
 
-    def __init__(self, state, port, username, password):
+    def __init__(self, state, port, ip, username, password):
         self._port = port
+        self._ip = ip
         self._state = XMState(state)
         self._log = logging.getLogger('discord_siriusxm.server')
 
@@ -28,9 +29,7 @@ class SiriusXMProxyServer:
                 update_handler=self._make_update_handler()
             )
 
-            if not self._xm.authenticate():
-                raise discord.DiscordException('Failed to log into SiriusXM')
-
+            self._xm.authenticate()
             self._state.channels = self._xm.get_channels()
         except Exception as e:
             self._log.error('error occuring while creating SiriusXM client:')
@@ -50,13 +49,14 @@ class SiriusXMProxyServer:
         app = make_async_http_app(self._xm)
 
         self._log.info(
-            f'running SiriusXM proxy server on http://0.0.0.0:{self._port}'
+            f'running SiriusXM proxy server on http://{self._ip}:{self._port}'
         )
         try:
             web.run_app(
                 app,
                 access_log=logging.getLogger('discord_siriusxm.server.request'),
                 print=None,
+                host=self._ip,
                 port=self._port
             )
         except Exception as e:
@@ -65,6 +65,6 @@ class SiriusXMProxyServer:
             raise(e)
 
 
-def run_server(state, port, username, password):
-    server = SiriusXMProxyServer(state, port, username, password)
+def run_server(state, port, ip, username, password):
+    server = SiriusXMProxyServer(state, port, ip, username, password)
     server.run()

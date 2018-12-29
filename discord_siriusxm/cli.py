@@ -29,12 +29,15 @@ from .server import run_server
               help='port to run SiriusXM Proxy server on')
 @click.option('-p', '--port', type=int, default=9999,
               help='port to run SiriusXM Proxy server on')
+@click.option('-h', '--host', type=str, default='127.0.0.1',
+              help='IP to bind SiriusXM Proxy server to. '
+                   'Must still be accessible via 127.0.0.1')
 @click.option('-o', '--output-folder', type=click.Path(), default=None,
               help='output folder to save stream off to as it plays them')
 @click.option('-r', '--reset-songs', is_flag=True,
               help='reset processed song database')
 def main(username, password, token, prefix, description,
-         port, output_folder, reset_songs):
+         port, host, output_folder, reset_songs):
     """Command line interface for SiriusXM radio bot for Discord"""
 
     coloredlogs.install(level='INFO')
@@ -54,12 +57,15 @@ def main(username, password, token, prefix, description,
             try:
                 if output_folder is not None:
                     pool.apply_async(
-                        func=run_archiver, args=(state, output_folder))
+                        func=run_archiver,
+                        args=(state, output_folder))
                     pool.apply_async(
-                        func=run_processor, args=(state, output_folder, reset_songs))
+                        func=run_processor,
+                        args=(state, output_folder, reset_songs))
 
                 pool.apply_async(
-                    func=run_server, args=(state, port, username, password))
+                    func=run_server,
+                    args=(state, port, host, username, password))
                 pool.apply(
                     func=run_bot,
                     args=(prefix, description, state, token, port, output_folder)
