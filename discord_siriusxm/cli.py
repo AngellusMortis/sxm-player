@@ -37,23 +37,27 @@ from .server import run_server
               help='output folder to save stream off to as it plays them')
 @click.option('-r', '--reset-songs', is_flag=True,
               help='reset processed song database')
-@click.option('-v', is_flag=True,
+@click.option('-l', '--log-file', type=click.Path(), default=None,
               help='enable verbose logging (shows HTTP requests)')
-@click.option('-vv', is_flag=True,
+@click.option('-v', '--verbose', is_flag=True,
+              help='enable verbose logging (shows HTTP requests)')
+@click.option('-vv', '--debug', is_flag=True,
               help='enable debug logging')
 def main(username, password, token, prefix, description,
-         port, host, output_folder, reset_songs, v, vv):
+         port, host, output_folder, reset_songs, verbose, debug, log_file):
     """Command line interface for SiriusXM radio bot for Discord"""
 
     level = 'INFO'
     request_level = logging.WARN
 
-    if vv:
+    if debug:
         level = 'DEBUG'
         request_level = logging.DEBUG
-    elif v:
+    elif verbose:
         request_level = logging.INFO
 
+    if log_file is not None:
+        logging.basicConfig(filename=log_file)
     coloredlogs.install(level=level)
 
     with Manager() as manager:

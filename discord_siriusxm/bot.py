@@ -186,6 +186,8 @@ class SiriusXMBotCog:
             return
 
         if self._state.player.is_playing:
+            if self._state.xm_state.active_channel_id is not None:
+                self._state.xm_state.reset_channel()
             await self._state.player.stop(disconnect=False)
             await asyncio.sleep(0.5)
         else:
