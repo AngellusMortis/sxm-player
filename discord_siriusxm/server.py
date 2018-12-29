@@ -30,7 +30,7 @@ class SiriusXMProxyServer:
 
             if not self._xm.authenticate():
                 raise discord.DiscordException('Failed to log into SiriusXM')
-            self._state.channels = self._xm.channels
+            self._state.channels = self._xm.get_channels()
         except Exception as e:
             self._log.error('error occuring while creating SiriusXM client:')
             self._log.error(traceback.format_exc())
