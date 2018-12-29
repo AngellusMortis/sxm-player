@@ -1,12 +1,13 @@
 import logging
 import os
 import time
+import traceback
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .models import Base, Episode, Song, XMState
-from .utils import get_files, splice_file, get_air_time
+from .utils import get_air_time, get_files, splice_file
 
 logger = logging.getLogger('discord_siriusxm.processor')
 
@@ -116,7 +117,9 @@ def process_cut(archives, db, cut, output_folder,
         # try:
         #     song_path = trim_song(song_path, cut.duration)
         # except Exception as e:
-        #     logger.error(f'error occurred in trimming: {e}')
+        #     logger.error('error occurred in trimming')
+        #     logger.error(traceback.format_exc())
+        #     raise e
 
         if path is not None:
             if os.path.getsize(path) < 1000:
@@ -254,4 +257,6 @@ def run_processor(state, output_folder, reset_songs):
             logger.info(
                 f'processed: {processed_songs} songs, {processed_shows} shows')
         except Exception as e:
-            logger.error(f'error occurred in processor loop: {e}')
+            logger.error('error occuring in processor loop:')
+            logger.error(traceback.format_exc())
+            raise e

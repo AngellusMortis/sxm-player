@@ -1,7 +1,9 @@
 import logging
+import traceback
 
 import discord
 from aiohttp import web
+
 from sxm import SiriusXMClient, make_async_http_app
 
 from .models import XMState
@@ -17,17 +19,22 @@ class SiriusXMProxyServer:
     def __init__(self, state, port, username, password):
         self._port = port
         self._state = XMState(state)
-        self._xm = SiriusXMClient(
-            username=username,
-            password=password,
-            update_handler=self._make_update_handler()
-        )
         self._log = logging.getLogger('discord_siriusxm.server')
 
-        if not self._xm.authenticate():
-            raise discord.DiscordException('Failed to log into SiriusXM')
+        try:
+            self._xm = SiriusXMClient(
+                username=username,
+                password=password,
+                update_handler=self._make_update_handler()
+            )
 
-        self._state.channels = self._xm.channels
+            if not self._xm.authenticate():
+                raise discord.DiscordException('Failed to log into SiriusXM')
+            self._state.channels = self._xm.channels
+        except Exception as e:
+            self._log.error('error occuring while creating SiriusXM client:')
+            self._log.error(traceback.format_exc())
+            raise(e)
 
     def _make_update_handler(self):
         def update_handler(data):
@@ -44,12 +51,17 @@ class SiriusXMProxyServer:
         self._log.info(
             f'running SiriusXM proxy server on http://0.0.0.0:{self._port}'
         )
-        web.run_app(
-            app,
-            access_log=logging.getLogger('discord_siriusxm.server.request'),
-            print=None,
-            port=self._port
-        )
+        try:
+            web.run_app(
+                app,
+                access_log=logging.getLogger('discord_siriusxm.server.request'),
+                print=None,
+                port=self._port
+            )
+        except Exception as e:
+            self._log.error('error occuring while running server:')
+            self._log.error(traceback.format_exc())
+            raise(e)
 
 
 def run_server(state, port, username, password):

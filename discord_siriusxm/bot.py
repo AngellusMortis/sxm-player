@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import os
+import traceback
 from dataclasses import dataclass
 
 import discord
@@ -200,7 +201,8 @@ class SiriusXMBotCog:
             self._log.info(f'play{log_archive}: {xm_channel.id}')
             await self._state.player.add_live_stream(live_stream)
         except Exception as e:
-            self._log.error(f'{type(e).__name__}: {e}')
+            self._log.error('error while trying to add channel to play queue:')
+            self._log.error(traceback.format_exc())
             await self._state.player.stop()
             await channel.send(
                 f'{author.mention}, something went wrong starting stream')
@@ -500,7 +502,8 @@ class SiriusXMBotCog:
             self._log.info(f'play: {db_item.file_path}')
             await self._state.player.add_file(db_item)
         except Exception as e:
-            self._log.error(f'{type(e).__name__}: {e}')
+            self._log.error('error while trying to add file to play queue:')
+            self._log.error(traceback.format_exc())
         else:
             await channel.send(
                     f'{author.mention}, added {db_item.bold_name} '

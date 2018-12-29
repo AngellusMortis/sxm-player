@@ -1,7 +1,7 @@
 import logging
 import os
-import subprocess
 import time
+import traceback
 
 from .models import XMState
 from .utils import get_files, splice_file
@@ -95,5 +95,7 @@ def run_archiver(state, output_folder):
                 f'completed processing: deleted files: {deleted}, '
                 f'archived file: {archived}'
             )
-        except Exception:
-            logger.error(f'error occurred in archiver loop: {e}')
+        except Exception as e:
+            logger.error('error occuring in archiver loop:')
+            logger.error(traceback.format_exc())
+            raise e

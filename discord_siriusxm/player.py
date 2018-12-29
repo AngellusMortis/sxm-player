@@ -327,6 +327,9 @@ class AudioPlayer:
             before_options='-f hls',
             after_options=live_stream.archive_file,
         )
+        self._log.warn(live_stream.stream_url)
+        self._log.warn(live_stream.archive_file)
+        self._log.warn(live_stream.channel.id)
         await self._add(None, source, live_stream)
 
     async def add_file(self, file_info):
@@ -348,17 +351,17 @@ class AudioPlayer:
 
     async def _reset_live_stream(self):
         if self._live_reset_counter < 5:
-            self.stop(disconnect=False)
+            await self.stop(disconnect=False)
 
             source = FFmpegPCMAudio(
                 self._live_stream.stream_url,
                 before_options='-f hls',
                 after_options=self._live_stream.archive_file,
             )
-            await self.add(None, source, self._live_stream)
+            await self._add(None, source, self._live_stream)
         else:
             self._log.error(f'could not reset live stream')
-            self.stop()
+            await self.stop()
 
     async def _audio_player(self):
         while True:
@@ -368,7 +371,10 @@ class AudioPlayer:
             self.recent.insert(0, self._current.item)
             self.recent = self.recent[:10]
 
-            if self._current.live is not None:
+            if self._current.live is None:
+                log_item = self._current.item.file_path
+            else:
+                log_item = self._current.live.stream_url
                 self._live_stream = self._current.live
                 # TODO: WIP
                 # code to try to get Discord to play from output .mp3 file for
@@ -389,7 +395,7 @@ class AudioPlayer:
 
             self._current.source = PCMVolumeTransformer(
                 self._current.source, volume=self._volume)
-            self._log.info(f'playing {self._current}')
+            self._log.info(f'playing {log_item}')
             self._voice.play(self._current.source, after=self._song_end)
 
             await self._event.wait()
@@ -430,7 +436,7 @@ class AudioPlayer:
                     await self._reset_live_stream()
             elif self.is_playing:
                 if self.current is None:
-                    self.stop()
+                    await self.stop()
                 else:
                     activity = Game(
                         name=self._current.item.pretty_name)

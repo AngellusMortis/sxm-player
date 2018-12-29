@@ -129,7 +129,10 @@ class XMState(DictState):
         if self._channels is None:
             self._channels = []
             for channel in self._state_dict['channels']:
-                self._channels.append(XMChannel(channel))
+                if isinstance(channel, XMChannel):
+                    self._channels.append(channel)
+                else:
+                    self._channels.append(XMChannel(channel))
         return self._channels
 
     @channels.setter
