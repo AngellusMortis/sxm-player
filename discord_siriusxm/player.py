@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import shlex
 import subprocess
 import threading
@@ -10,9 +11,10 @@ from discord import (AudioSource, ClientException, Game, PCMVolumeTransformer,
 from discord.ext import commands as discord_commands
 from discord.opus import Encoder as OpusEncoder
 from discord.player import log
-# from discord.player import AudioPlayer as DiscordAudioPlayer
 
 from .models import LiveStreamInfo, QueuedItem, SiriusXMActivity, XMState
+
+# from discord.player import AudioPlayer as DiscordAudioPlayer
 
 
 # TODO: try to get merged upstream
@@ -322,6 +324,9 @@ class AudioPlayer:
         return False
 
     async def add_live_stream(self, live_stream: LiveStreamInfo):
+        if os.path.exists(live_stream.archive_file):
+                os.remove(live_stream.archive_file)
+
         source = FFmpegPCMAudio(
             live_stream.stream_url,
             before_options='-f hls',

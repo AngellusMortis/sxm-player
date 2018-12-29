@@ -200,9 +200,6 @@ class SiriusXMBotCog:
             stream_file = os.path.join(
                 self._output_folder, f'{xm_channel.id}.mp3')
 
-            if os.path.exists(stream_file):
-                os.remove(stream_file)
-
         live_stream = LiveStreamInfo(stream_file, xm_url, xm_channel)
         try:
             self._log.info(f'play{log_archive}: {xm_channel.id}')
