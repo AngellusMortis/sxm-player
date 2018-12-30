@@ -5,16 +5,20 @@ import shlex
 import subprocess
 import threading
 import time
+from typing import Optional, Union
 
 from discord import (AudioSource, ClientException, Game, PCMVolumeTransformer,
-                     VoiceClient)
+                     VoiceChannel, VoiceClient)
 from discord.ext import commands as discord_commands
 from discord.opus import Encoder as OpusEncoder
 from discord.player import log
 
-from .models import LiveStreamInfo, QueuedItem, SiriusXMActivity, XMState
+from .models import (Episode, LiveStreamInfo, QueuedItem, SiriusXMActivity,
+                     Song, XMState)
 
 # from discord.player import AudioPlayer as DiscordAudioPlayer
+
+__all__ = ['AudioPlayer']
 
 
 # TODO: try to get merged upstream
@@ -234,7 +238,7 @@ class AudioPlayer:
     _live_source: AudioSource = None
     _live_player: DiscordAudioPlayer = None
 
-    def __init__(self, bot, xm_state):
+    def __init__(self, bot: discord_commands.Bot, xm_state: XMState):
         self._bot = bot
         self._xm_state = xm_state
         self._log = logging.getLogger('discord_siriusxm.player')
@@ -244,13 +248,17 @@ class AudioPlayer:
         self._bot.loop.create_task(self._update())
 
     @property
-    def is_playing(self):
+    def is_playing(self) -> bool:
+        """ Returns if `AudioPlayer` is playing audio """
+
         if self._voice is None or self._voice is None:
             return False
 
         return self._voice.is_playing()
 
-    async def set_voice(self, channel):
+    async def set_voice(self, channel) -> None:
+        """ Sets voice channel for audio player """
+
         if self._voice is None:
             self._voice = await channel.connect()
             self._task = self._bot.loop.create_task(self._audio_player())
@@ -258,17 +266,23 @@ class AudioPlayer:
             await self._voice.move_to(channel)
 
     @property
-    def current(self):
+    def current(self) -> Union[QueuedItem, None]:
+        """ Returns current `QueuedItem` that is being played """
+
         if self._current is not None:
             return self._current.item
         return None
 
     @property
-    def volume(self):
+    def volume(self) -> float:
+        """ Gets current volume level """
+
         return self._volume
 
     @volume.setter
-    def volume(self, volume) -> bool:
+    def volume(self, volume: float) -> None:
+        """ Sets current volume level """
+
         if volume < 0.0:
             volume = 0.0
         elif volume > 1.0:
@@ -278,7 +292,9 @@ class AudioPlayer:
         if self._current is not None:
             self._current.source.volume = self._volume
 
-    async def stop(self, disconnect=True):
+    async def stop(self, disconnect: bool = True) -> None:
+        """ Stops the `AudioPlayer` """
+
         if self._current is not None:
             self._current.source.cleanup()
             self._current = None
@@ -305,7 +321,9 @@ class AudioPlayer:
                 await self._voice.disconnect()
                 self._voice = None
 
-    async def kick(self, channel) -> bool:
+    async def kick(self, channel: VoiceChannel) -> bool:
+        """ Kicks bot out of channel """
+
         if self._voice is None:
             return False
 
@@ -315,6 +333,8 @@ class AudioPlayer:
         return False
 
     async def skip(self) -> bool:
+        """ Skips current `QueueItem` """
+
         if self._voice is not None:
             if self._queue.qsize() < 1:
                 await self.stop()
@@ -323,7 +343,9 @@ class AudioPlayer:
             return True
         return False
 
-    async def add_live_stream(self, live_stream: LiveStreamInfo):
+    async def add_live_stream(self, live_stream: LiveStreamInfo) -> None:
+        """ Adds HLS live stream to playing queue """
+
         if os.path.exists(live_stream.archive_file):
                 os.remove(live_stream.archive_file)
 
@@ -334,24 +356,33 @@ class AudioPlayer:
         )
         await self._add(None, source, live_stream)
 
-    async def add_file(self, file_info):
+    async def add_file(self, file_info: Union[Song, Episode]) -> None:
+        """ Adds file to playing queue """
+
         source = FFmpegPCMAudio(
             file_info.file_path,
         )
 
         self._add(file_info, source)
 
-    async def _add(self, file_info, source, live_stream=None):
+    async def _add(self, file_info: Union[Song, Episode, None],
+                   source: AudioSource,
+                   live_stream: Optional[LiveStreamInfo] = None) -> None:
+        """ Adds item to playing queue """
+
         if self._voice is None:
             raise ClientException('Voice client is not set')
 
         item = QueuedItem(file_info, source, live_stream)
         await self._queue.put(item)
 
-    def _song_end(self, error=None):
+    def _song_end(self, error: Optional[Exception] = None) -> None:
+        """ Callback for `discord.AudioPlayer`/`discord.VoiceClient` """
         self._bot.loop.call_soon_threadsafe(self._event.set)
 
-    async def _reset_live_stream(self):
+    async def _reset_live_stream(self) -> None:
+        """ Stop and restart the existing HLS live stream """
+
         if self._live_reset_counter < 5:
             await self.stop(disconnect=False)
 
@@ -360,12 +391,15 @@ class AudioPlayer:
                 before_options='-f hls',
                 after_options=self._live_stream.archive_file,
             )
+            self._live_reset_counter += 1
             await self._add(None, source, self._live_stream)
         else:
             self._log.error(f'could not reset live stream')
             await self.stop()
 
-    async def _audio_player(self):
+    async def _audio_player(self) -> None:
+        """ Bot task to manage and run the audio player """
+
         while True:
             self._event.clear()
             self._current = await self._queue.get()
@@ -385,7 +419,9 @@ class AudioPlayer:
                 # try:
                 #     self._live_source = self._current.source
                 #     self._live_player = DiscordAudioPlayer(
-                #         self._live_source, FakeClient(), after=self._song_end)
+                #         self._live_source,
+                #         FakeClient(),
+                #         after=self._song_end)
                 #     self._live_player.start()
                 #     await asyncio.sleep(30)
 
@@ -403,7 +439,9 @@ class AudioPlayer:
             await self._event.wait()
             self._current = None
 
-    async def _update(self):
+    async def _update(self) -> None:
+        """ Bot task update the state of the audio player """
+
         await self._bot.wait_until_ready()
 
         sleep_time = 10
@@ -434,6 +472,7 @@ class AudioPlayer:
                             f'could not retrieve live stream data, resetting')
                         await self._reset_live_stream()
                 else:
+                    self._log.error(self._live_reset_counter)
                     self._log.warn(f'live stream lost, resetting')
                     await self._reset_live_stream()
             elif self.is_playing:

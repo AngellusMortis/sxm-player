@@ -18,15 +18,16 @@ from .server import run_server
 
 
 @click.command()
-@click.option('--username', prompt=True,
+@click.option('--username', type=str, prompt=True,
               help='SiriusXM Username')
-@click.option('--password', prompt=True, hide_input=True,
+@click.option('--password', type=str, prompt=True, hide_input=True,
               help='SiriusXM Password')
-@click.option('--token', prompt=True,
+@click.option('--token', type=str, prompt=True,
               help='Discord bot token')
-@click.option('--prefix', default='/sxm ',
+@click.option('--prefix', type=str, default='/sxm ',
               help='Discord bot command prefix')
-@click.option('--description', default='SiriusXM radio bot for Discord',
+@click.option('--description', type=str,
+              default='SiriusXM radio bot for Discord',
               help='port to run SiriusXM Proxy server on')
 @click.option('-p', '--port', type=int, default=9999,
               help='port to run SiriusXM Proxy server on')
@@ -43,8 +44,9 @@ from .server import run_server
               help='enable verbose logging (shows HTTP requests)')
 @click.option('-vv', '--debug', is_flag=True,
               help='enable debug logging')
-def main(username, password, token, prefix, description,
-         port, host, output_folder, reset_songs, verbose, debug, log_file):
+def main(username: str, password: str, token: str, prefix: str,
+         description: str, port: int, host: str, output_folder: str,
+         reset_songs: bool, verbose: bool, debug: bool, log_file: str):
     """Command line interface for SiriusXM radio bot for Discord"""
 
     level = 'INFO'
@@ -87,7 +89,8 @@ def main(username, password, token, prefix, description,
                 )
                 pool.apply(
                     func=run_bot,
-                    args=(prefix, description, state, token, port, output_folder)
+                    args=(prefix, description, state,
+                          token, port, output_folder)
                 )
                 pool.close()
                 pool.join()

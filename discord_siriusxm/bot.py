@@ -4,18 +4,22 @@ import logging
 import os
 import traceback
 from dataclasses import dataclass
+from typing import Optional
 
 import discord
 import humanize
-from discord.ext import commands as discord_commands
+from discord.ext.commands import Bot, Context, command
 from tabulate import tabulate
 
 from sqlalchemy import or_
+from sqlalchemy.orm.session import Session
 from sxm.models import XMImage, XMSong
 
 from .models import Episode, LiveStreamInfo, Song, XMState
 from .player import AudioPlayer
-from .processor import init_db
+from .utils import init_db
+
+__all__ = ['run_bot']
 
 
 @dataclass
@@ -23,9 +27,9 @@ class BotState:
     """Class to store the state for Discord bot"""
     xm_state: XMState = None
     player: AudioPlayer = None
-    _bot: discord_commands.Bot = None
+    _bot: Bot = None
 
-    def __init__(self, state_dict, bot):
+    def __init__(self, state_dict: dict, bot: Bot):
         self._bot = bot
         self.xm_state = XMState(state_dict)
         self.player = AudioPlayer(bot, self.xm_state)
@@ -40,9 +44,11 @@ class SiriusXMBotCog:
     _state = None
     _output_folder = None
 
-    def __init__(self, bot, state, port, output_folder):
+    def __init__(self, bot: Bot, state_dict: dict,
+                 port: int, output_folder: str):
+
         self._bot = bot
-        self._state = BotState(state, bot)
+        self._state = BotState(state_dict, bot)
         self._log = logging.getLogger('discord_siriusxm.bot')
         self._proxy_base = f'http://127.0.0.1:{port}'
         self._output_folder = output_folder
@@ -55,9 +61,10 @@ class SiriusXMBotCog:
             self._bot.loop.create_task(self._state.player.stop())
         self._state.xm_state.reset_channel()
 
-    @discord_commands.command(pass_context=True)
-    async def channels(self, ctx):
+    @command(pass_context=True)
+    async def channels(self, ctx: Context) -> None:
         """Bot will PM with list of possible SiriusXM channel"""
+
         author = ctx.message.author
 
         display_channels = []
@@ -87,9 +94,10 @@ class SiriusXMBotCog:
 
             await author.send(f"```{message}```")
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def summon(self, ctx):
+    @command(pass_context=True, no_pm=True)
+    async def summon(self, ctx: Context) -> None:
         """Summons the bot to join your voice channel"""
+
         author = ctx.message.author
         if author.voice is None:
             await ctx.message.channel.send(
@@ -99,10 +107,12 @@ class SiriusXMBotCog:
         summoned_channel = author.voice.channel
         await self._state.player.set_voice(summoned_channel)
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def volume(self, ctx, amount: float = None):
+    @command(pass_context=True, no_pm=True)
+    async def volume(self, ctx: Context,
+                     amount: Optional[float] = None) -> None:
         """Changes the volume of the music that is being played. 1.0 = 100%
         """
+
         channel = ctx.message.channel
         author = ctx.message.author
 
@@ -122,11 +132,12 @@ class SiriusXMBotCog:
             await channel.send(
                 f'{author.mention}, set volume to {self._state.player.volume}')
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def stop(self, ctx):
+    @command(pass_context=True, no_pm=True)
+    async def stop(self, ctx: Context) -> None:
         """Stops playing audio and leaves the voice channel.
         This also clears the queue.
         """
+
         channel = ctx.message.channel
         author = ctx.message.author
 
@@ -141,10 +152,11 @@ class SiriusXMBotCog:
             await channel.send(
                 f'{author.mention}, cannot stop music. Nothing is playing')
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def kick(self, ctx):
+    @command(pass_context=True, no_pm=True)
+    async def kick(self, ctx: Context) -> None:
         """Kicks bot from current voice channel. If playing music, this will stop it
         """
+
         channel = ctx.message.channel
         author = ctx.message.author
 
@@ -162,15 +174,18 @@ class SiriusXMBotCog:
                     f'Are you sure I am in the same voice channel as you?'
                 )
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def channel(self, ctx, *, channel_id: str = None):
+    @command(pass_context=True, no_pm=True)
+    async def channel(self, ctx: Context, *,
+                      channel_id: Optional[str] = None) -> None:
         """Plays a specific SiriusXM channel"""
+
         channel = ctx.message.channel
         author = ctx.message.author
 
         if author.voice is None:
             self._log.debug('play: no channel')
-            await channel.send(f'{author.mention}, you are not in a voice channel.')
+            await channel.send(
+                f'{author.mention}, you are not in a voice channel.')
             return
 
         if channel_id is None:
@@ -204,7 +219,7 @@ class SiriusXMBotCog:
         try:
             self._log.info(f'play{log_archive}: {xm_channel.id}')
             await self._state.player.add_live_stream(live_stream)
-        except Exception as e:
+        except Exception:
             self._log.error('error while trying to add channel to play queue:')
             self._log.error(traceback.format_exc())
             await self._state.player.stop()
@@ -218,7 +233,10 @@ class SiriusXMBotCog:
                 f'**{author.voice.channel.mention}**'
             )
 
-    async def _sxm_now_playing(self, ctx):
+    async def _sxm_now_playing(self, ctx: Context) -> None:
+        """ Sends message for what is currently playing on the
+        SiriusXM HLS live stream """
+
         channel = ctx.message.channel
         author = ctx.message.author
 
@@ -281,9 +299,10 @@ class SiriusXMBotCog:
 
         await channel.send(author.mention, embed=embed)
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def playing(self, ctx):
+    @command(pass_context=True, no_pm=True)
+    async def playing(self, ctx: Context) -> None:
         """Responds with what the bot currently playing"""
+
         channel = ctx.message.channel
         author = ctx.message.author
 
@@ -300,7 +319,10 @@ class SiriusXMBotCog:
                 f'{self._state.player.current.bold_name}'
             )
 
-    async def _sxm_recent(self, ctx, count):
+    async def _sxm_recent(self, ctx: Context, count: int) -> None:
+        """ Respons with what has recently played on the
+        SiriusXM HLS live stream """
+
         channel = ctx.message.channel
         author = ctx.message.author
 
@@ -352,10 +374,11 @@ class SiriusXMBotCog:
                 f'{author.mention}, no recent songs played'
             )
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def recent(self, ctx, count: int = 3):
+    @command(pass_context=True, no_pm=True)
+    async def recent(self, ctx: Context, count: Optional[int] = 3) -> None:
         """Responds with the last 1-10 songs that been
         played on this channel"""
+
         channel = ctx.message.channel
         author = ctx.message.author
 
@@ -390,10 +413,15 @@ class SiriusXMBotCog:
 
             await channel.send(message)
 
-    def _get_db(self):
+    def _get_db(self) -> Session:
+        """ Gets song/show database connection """
+
         return init_db(os.path.join(self._output_folder, '..', 'processed'))
 
-    async def _search_archive(self, ctx, search, is_song):
+    async def _search_archive(self, ctx: Context,
+                              search: str, is_song: bool) -> None:
+        """ Searches song/show database and responds with results """
+
         channel = ctx.message.channel
         author = ctx.message.author
         db = self._get_db()
@@ -438,33 +466,35 @@ class SiriusXMBotCog:
                 f'found for `{search}`'
             )
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def songs(self, ctx, search: str = None):
+    @command(pass_context=True, no_pm=True)
+    async def songs(self, ctx: Context, search: Optional[str] = None) -> None:
         """Searches for an archived song to play.
         Only returns the first 10 songs"""
 
         await self._search_archive(ctx, search, True)
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def shows(self, ctx, search: str = None):
+    @command(pass_context=True, no_pm=True)
+    async def shows(self, ctx: Context, search: Optional[str] = None) -> None:
         """Searches for an archived show to play.
         Only returns the first 10 shows"""
 
         await self._search_archive(ctx, search, False)
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def song(self, ctx, song_id: str = None):
+    @command(pass_context=True, no_pm=True)
+    async def song(self, ctx: Context, song_id: Optional[str] = None) -> None:
         """Adds a song to a play queue"""
 
         await self._play_file(ctx, song_id, True)
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def show(self, ctx, show_id: str = None):
+    @command(pass_context=True, no_pm=True)
+    async def show(self, ctx: Context, show_id: Optional[str] = None) -> None:
         """Adds a show to a play queue"""
 
         await self._play_file(ctx, show_id, False)
 
-    async def _play_file(self, ctx, guid, is_song):
+    async def _play_file(self, ctx: Context, guid: str, is_song: bool) -> None:
+        """ Queues a song/show file to be played """
+
         channel = ctx.message.channel
         author = ctx.message.author
         db = self._get_db()
@@ -474,7 +504,8 @@ class SiriusXMBotCog:
 
         if author.voice is None:
             self._log.debug('play: no channel')
-            await channel.send(f'{author.mention}, you are not in a voice channel.')
+            await channel.send(
+                f'{author.mention}, you are not in a voice channel.')
             return
 
         if guid is None:
@@ -510,7 +541,7 @@ class SiriusXMBotCog:
         try:
             self._log.info(f'play: {db_item.file_path}')
             await self._state.player.add_file(db_item)
-        except Exception as e:
+        except Exception:
             self._log.error('error while trying to add file to play queue:')
             self._log.error(traceback.format_exc())
         else:
@@ -519,9 +550,10 @@ class SiriusXMBotCog:
                     f'to now playing queue'
                 )
 
-    @discord_commands.command(pass_context=True, no_pm=True)
-    async def skip(self, ctx):
+    @command(pass_context=True, no_pm=True)
+    async def skip(self, ctx: Context) -> None:
         """Skips current song (only for ad-hoc, not SiriusXM radio)"""
+
         channel = ctx.message.channel
         author = ctx.message.author
 
@@ -542,13 +574,16 @@ class SiriusXMBotCog:
         await self._state.player.skip()
 
 
-def run_bot(prefix, description, state, token, port, output_folder):
-    bot = discord_commands.Bot(
+def run_bot(prefix: str, description: str, state_dict: dict, token: str,
+            port: int, output_folder: Optional[str] = None) -> None:
+    """ Runs SiriusXM Discord bot """
+
+    bot = Bot(
         command_prefix=prefix,
         description=description,
         pm_help=True
     )
-    bot.add_cog(SiriusXMBotCog(bot, state, port, output_folder))
+    bot.add_cog(SiriusXMBotCog(bot, state_dict, port, output_folder))
 
     if output_folder is None:
         bot.remove_command('songs')

@@ -2,9 +2,12 @@ import logging
 import os
 import time
 import traceback
+from typing import Union
 
 from .models import XMState
 from .utils import get_files, splice_file
+
+__all__ = ['run_archiver']
 
 ARCHIVE_CHUNK = 600
 ARCHIVE_BUFFER = 5
@@ -12,18 +15,25 @@ ARCHIVE_BUFFER = 5
 logger = logging.getLogger('discord_siriusxm.archiver')
 
 
-def delete_old_archives(archive_folder, archive_base, ignored_file):
+def delete_old_archives(archive_folder: str, archive_base: str,
+                        current_file: str) -> None:
+    """ Deletes any old versions of archive that is about to be made """
+
     archive_files = get_files(archive_folder)
 
     for archive_file in archive_files:
         abs_path = os.path.join(archive_folder, archive_file)
         if archive_file.startswith(archive_base) and \
-                archive_file != ignored_file:
+                archive_file != current_file:
             logger.debug(f'deleted old archive: {abs_path}')
             os.remove(abs_path)
 
 
-def process_stream_file(abs_path, state, channel_id, archive_folder) -> str:
+def process_stream_file(abs_path: str, state: XMState,
+                        channel_id: str,
+                        archive_folder: str) -> Union[str, None]:
+    """ Processes stream file by creating an archive from it if necessary """
+
     max_archive_cutoff = int(time.time()) - ARCHIVE_BUFFER
     creation_time = int(os.path.getatime(abs_path)) + ARCHIVE_BUFFER
 
@@ -53,8 +63,10 @@ def process_stream_file(abs_path, state, channel_id, archive_folder) -> str:
     return None
 
 
-def run_archiver(state, output_folder):
-    state = XMState(state)
+def run_archiver(state_dict: str, output_folder: str) -> None:
+    """ Runs archiver loop """
+
+    state = XMState(state_dict)
 
     stream_folder = os.path.join(output_folder, 'streams')
     archive_folder = os.path.join(output_folder, 'archive')

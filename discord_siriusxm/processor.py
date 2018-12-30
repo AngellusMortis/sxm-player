@@ -2,50 +2,25 @@ import logging
 import os
 import time
 import traceback
+from typing import List
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm.session import Session
+from sxm.models import XMMarker
 
-from .models import Base, Episode, Song, XMState
-from .utils import get_air_time, get_files, splice_file
+from .models import Episode, Song, XMState
+from .utils import get_air_time, get_files, init_db, splice_file
+
+__all__ = ['run_processor']
 
 logger = logging.getLogger('discord_siriusxm.processor')
 
 MAX_DUPLICATE_COUNT = 3
 
 
-def init_db(base_folder, cleanup=True, reset=False):
-    os.makedirs(base_folder, exist_ok=True)
+def path_filter(word: str) -> str:
+    """ Filters out known words to call issues for creating
+    names for folders/files """
 
-    song_db = os.path.join(base_folder, 'songs.db')
-
-    if reset and os.path.exists(song_db):
-        os.remove(song_db)
-
-    db_engine = create_engine(f'sqlite:///{song_db}')
-    Base.metadata.create_all(db_engine)
-    db_session = sessionmaker(bind=db_engine)()
-
-    if cleanup:
-        removed = 0
-        for song in db_session.query(Song).all():
-            if not os.path.exists(song.file_path):
-                removed += 1
-                db_session.delete(song)
-
-        for show in db_session.query(Episode).all():
-            if not os.path.exists(show.file_path):
-                removed += 1
-                db_session.delete(show)
-
-        if removed > 0:
-            logger.warn(f'deleted missing songs/shows: {removed}')
-            db_session.commit()
-
-    return db_session
-
-
-def path_filter(word):
     return word\
         .replace('Counterfeit.', 'Counterfeit')\
         .replace('F**ker', 'Fucker')\
@@ -55,8 +30,12 @@ def path_filter(word):
         .strip()
 
 
-def process_cut(archives, db, cut, output_folder,
-                active_channel_id, is_song=True):
+def process_cut(archives: List[str], db: Session, cut: XMMarker,
+                output_folder: str, active_channel_id: str,
+                is_song: bool = True) -> bool:
+    """ Processes `archives` to splice out an
+        instance of `XMMarker` if it exists """
+
     archive = None
     start = int(cut.time / 1000) + 20
     padded_duration = int(cut.duration + 20)
@@ -103,7 +82,8 @@ def process_cut(archives, db, cut, output_folder,
                 album_or_show = path_filter(cut.episode.show.long_title or
                                             cut.episode.show.medium_title)
 
-            filename = f'{title}.{air_time.strftime("%Y-%m-%d-%H.%M")}.{cut.guid}.mp3'
+            filename = \
+                f'{title}.{air_time.strftime("%Y-%m-%d-%H.%M")}.{cut.guid}.mp3'
             folder = output_folder
 
             if album_or_show is not None:
@@ -113,13 +93,6 @@ def process_cut(archives, db, cut, output_folder,
         path = os.path.join(folder, filename)
         logger.debug(f'{cut.duration}: {path}')
         path = splice_file(archive, path, start, end)
-
-        # try:
-        #     song_path = trim_song(song_path, cut.duration)
-        # except Exception as e:
-        #     logger.error('error occurred in trimming')
-        #     logger.error(traceback.format_exc())
-        #     raise e
 
         if path is not None:
             if os.path.getsize(path) < 1000:
@@ -157,7 +130,12 @@ def process_cut(archives, db, cut, output_folder,
     return False
 
 
-def process_cuts(archives, db, output_folder, channel_id, cuts, is_song=True):
+def process_cuts(archives: List[str], db: Session, output_folder: str,
+                 channel_id: str, cuts: List[XMMarker],
+                 is_song: bool = True) -> int:
+    """ Processes `archives` to splice out any
+        instance of `XMMarker` if it exists """
+
     processed = 0
     for cut in cuts:
         if cut.duration == 0.0:
@@ -200,9 +178,11 @@ def process_cuts(archives, db, output_folder, channel_id, cuts, is_song=True):
     return processed
 
 
-def run_processor(state, output_folder, reset_songs):
+def run_processor(state_dict: dict, output_folder: str,
+                  reset_songs: bool) -> None:
+    """ Runs song/show processor look """
 
-    state = XMState(state)
+    state = XMState(state_dict)
 
     processed_folder = os.path.join(output_folder, 'processed')
     archive_folder = os.path.join(output_folder, 'archive')

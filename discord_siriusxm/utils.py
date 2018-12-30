@@ -2,16 +2,58 @@ import datetime
 import logging
 import os
 import subprocess
+from typing import List, Optional
 
-from pydub import AudioSegment
-from pydub.silence import split_on_silence
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm.session import Session
+from sxm.models import XMMarker
+
+from .models import Base, Episode, Song
 
 TRIM_VARIANCE = 0.05
 
 logger = logging.getLogger('discord_siriusxm.utils')
 
 
-def get_air_time(cut):
+def init_db(base_folder: str, cleanup: Optional[bool] = True,
+            reset: Optional[bool] = False) -> Session:
+    """ Initializes song database connection """
+
+    os.makedirs(base_folder, exist_ok=True)
+
+    song_db = os.path.join(base_folder, 'songs.db')
+
+    if reset and os.path.exists(song_db):
+        os.remove(song_db)
+
+    db_engine = create_engine(f'sqlite:///{song_db}')
+    Base.metadata.create_all(db_engine)
+    db_session = sessionmaker(bind=db_engine)()
+
+    if cleanup:
+        removed = 0
+        for song in db_session.query(Song).all():
+            if not os.path.exists(song.file_path):
+                removed += 1
+                db_session.delete(song)
+
+        for show in db_session.query(Episode).all():
+            if not os.path.exists(show.file_path):
+                removed += 1
+                db_session.delete(show)
+
+        if removed > 0:
+            logger.warn(f'deleted missing songs/shows: {removed}')
+            db_session.commit()
+
+    return db_session
+
+
+def get_air_time(cut: XMMarker) -> datetime.datetime:
+    """ Dates UTC datetime object for the air
+    date of a `XMMarker` to the hour """
+
     air_time = datetime.datetime.fromtimestamp(
         int(cut.time/1000), tz=datetime.timezone.utc)
     air_time = air_time.replace(minute=0, second=0, microsecond=0)
@@ -19,7 +61,9 @@ def get_air_time(cut):
     return air_time
 
 
-def get_files(folder):
+def get_files(folder: str) -> List[str]:
+    """ Gets list of files in a folder """
+
     dir_list = os.listdir(folder)
 
     files = []
@@ -31,7 +75,10 @@ def get_files(folder):
     return files
 
 
-def splice_file(input_file, output_file, start_time, end_time) -> str:
+def splice_file(input_file: str, output_file: str,
+                start_time: int, end_time: int) -> str:
+    """ Splices a chunk off of the input file and saves it """
+
     args = [
         'ffmpeg', '-y',
         '-i', input_file, '-acodec', 'copy',
@@ -50,52 +97,3 @@ def splice_file(input_file, output_file, start_time, end_time) -> str:
     else:
         logger.info(f'spliced file: {output_file}')
         return output_file
-
-
-def attempt_trim(song, song_path, expected_length):
-    for min_silence in range(500, 0, -100):
-        for silence_thresh in range(-14, -30, -2):
-            logger.warn(
-                f'attempting to trim file: {song_path} '
-                f'{silence_thresh} {min_silence}'
-            )
-
-            song_chunks = split_on_silence(
-                song,
-                min_silence_len=min_silence,
-                silence_thresh=silence_thresh
-            )
-
-            logger.warn(f'chunks: {len(song_chunks)}')
-            for chunk in song_chunks:
-                length = float(len(chunk) / 1000)
-                precent_expected = (length / expected_length)
-                if precent_expected > (1.0 - TRIM_VARIANCE):
-                    if precent_expected < (1.0 + TRIM_VARIANCE):
-                        return chunk
-                    logger.warn(
-                        f'file to large: {length}/{expected_length} ({precent_expected})'
-                    )
-                else:
-                    logger.warn(
-                        f'file to small: {length}/{expected_length} ({precent_expected})'
-                    )
-    return None
-
-
-def trim_song(song_path, expected_length):
-    song = AudioSegment.from_file(song_path)
-
-    song_chunk = attempt_trim(song, song_path, expected_length)
-
-    if song_chunk is not None:
-        logger.warn(f'trim file successfully: {song_path}')
-
-        # os.path.remove(song_path)
-
-        song_path = song_path.replace('.untrimmed', '')
-        song_chunk.export(song_path, bitrate='256k', format="mp3")
-    else:
-        logger.warn(f'could not trim file: {song_path}')
-
-    return song_path

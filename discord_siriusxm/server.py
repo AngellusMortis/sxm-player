@@ -1,12 +1,14 @@
 import logging
 import traceback
+from typing import Callable
 
-import discord
 from aiohttp import web
 
 from sxm import SiriusXMClient, make_async_http_app
 
 from .models import XMState
+
+__all__ = ['run_server']
 
 
 class SiriusXMProxyServer:
@@ -16,10 +18,11 @@ class SiriusXMProxyServer:
     _xm = None
     _state = None
 
-    def __init__(self, state, port, ip, username, password):
+    def __init__(self, state_dict: dict, port: int,
+                 ip: str, username: str, password: str):
         self._port = port
         self._ip = ip
-        self._state = XMState(state)
+        self._state = XMState(state_dict)
         self._log = logging.getLogger('discord_siriusxm.server')
 
         try:
@@ -36,8 +39,11 @@ class SiriusXMProxyServer:
             self._log.error(traceback.format_exc())
             raise(e)
 
-    def _make_update_handler(self):
-        def update_handler(data):
+    def _make_update_handler(self) -> Callable[[dict], None]:
+        """ Returns update handler to be called by
+        `SiriusXMClient.get_playlist` when a HLS playlist updates """
+
+        def update_handler(data: dict) -> None:
             self._log.debug(f'update data: {data}')
             if self._state.active_channel_id == data['channelId']:
                 self._log.info(
@@ -45,7 +51,9 @@ class SiriusXMProxyServer:
                 self._state.live = data
         return update_handler
 
-    def run(self, log_level=logging.WARN):
+    def run(self, log_level: int = logging.WARN) -> None:
+        """ Runs SiriusXM proxy server """
+
         app = make_async_http_app(self._xm)
 
         self._log.info(
@@ -69,6 +77,9 @@ class SiriusXMProxyServer:
             raise(e)
 
 
-def run_server(state, port, ip, username, password, log_level):
-    server = SiriusXMProxyServer(state, port, ip, username, password)
+def run_server(state_dict: dict, port: int, ip: str,
+               username: str, password: str, log_level: int) -> None:
+    """ Creates and runs SiriusXM proxy server """
+
+    server = SiriusXMProxyServer(state_dict, port, ip, username, password)
     server.run(log_level=log_level)
