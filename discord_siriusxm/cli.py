@@ -68,6 +68,7 @@ def main(username: str, password: str, token: str, prefix: str,
 
         process_count = 2
         if output_folder is not None:
+            state['output'] = output_folder
             process_count = 4
 
         def init_worker():
@@ -78,10 +79,10 @@ def main(username: str, password: str, token: str, prefix: str,
                 if output_folder is not None:
                     pool.apply_async(
                         func=run_archiver,
-                        args=(state, output_folder))
+                        args=(state))
                     pool.apply_async(
                         func=run_processor,
-                        args=(state, output_folder, reset_songs))
+                        args=(state, reset_songs))
 
                 pool.apply_async(
                     func=run_server,
@@ -90,7 +91,7 @@ def main(username: str, password: str, token: str, prefix: str,
                 pool.apply(
                     func=run_bot,
                     args=(prefix, description, state,
-                          token, port, output_folder)
+                          token, port)
                 )
                 pool.close()
                 pool.join()

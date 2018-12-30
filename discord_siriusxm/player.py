@@ -5,6 +5,7 @@ import shlex
 import subprocess
 import threading
 import time
+from random import SystemRandom
 from typing import Optional, Union
 
 from discord import (AudioSource, ClientException, Game, PCMVolumeTransformer,
@@ -12,6 +13,8 @@ from discord import (AudioSource, ClientException, Game, PCMVolumeTransformer,
 from discord.ext import commands as discord_commands
 from discord.opus import Encoder as OpusEncoder
 from discord.player import log
+
+from sxm.models import XMChannel
 
 from .models import (Episode, LiveStreamInfo, QueuedItem, SiriusXMActivity,
                      Song, XMState)
@@ -221,6 +224,7 @@ class DiscordAudioPlayer(threading.Thread):
 
 class AudioPlayer:
     recent = None
+    upcoming = None
 
     _log = None
     _current: AudioSource = None
@@ -238,12 +242,17 @@ class AudioPlayer:
     _live_source: AudioSource = None
     _live_player: DiscordAudioPlayer = None
 
+    _playlist_channel: XMChannel = None
+    _random: SystemRandom = None
+
     def __init__(self, bot: discord_commands.Bot, xm_state: XMState):
         self._bot = bot
         self._xm_state = xm_state
         self._log = logging.getLogger('discord_siriusxm.player')
+        self._random = SystemRandom()
 
         self.recent = []
+        self.upcoming = []
 
         self._bot.loop.create_task(self._update())
 
@@ -295,11 +304,20 @@ class AudioPlayer:
     async def stop(self, disconnect: bool = True) -> None:
         """ Stops the `AudioPlayer` """
 
+        self._xm_state.reset_channel()
+
+        while not self._queue.empty():
+            self._queue.get_nowait()
+
+        if self._playlist_channel is not None:
+            self._playlist_channel = None
+
         if self._current is not None:
             self._current.source.cleanup()
             self._current = None
 
         self.recent = []
+        self.upcoming = []
         if self._live_source is not None:
             self._live_source.cleanup()
             self._live_source = None
@@ -343,6 +361,14 @@ class AudioPlayer:
             return True
         return False
 
+    async def add_playlist(self, xm_channel: XMChannel) -> None:
+        """ Creates a playlist of random songs from an channel """
+
+        self._playlist_channel = xm_channel
+
+        for x in range(5):
+            await self._add_random_playlist_song()
+
     async def add_live_stream(self, live_stream: LiveStreamInfo) -> None:
         """ Adds HLS live stream to playing queue """
 
@@ -363,7 +389,19 @@ class AudioPlayer:
             file_info.file_path,
         )
 
-        self._add(file_info, source)
+        await self._add(file_info, source)
+
+    async def _add_random_playlist_song(self) -> None:
+        songs = self._xm_state.db.query(Song.title, Song.artist)\
+            .filter_by(channel=self._playlist_channel.id).distinct().all()
+
+        song = self._random.choice(songs)
+        song = self._xm_state.db.query(Song).filter_by(
+            channel=self._playlist_channel.id,
+            title=song[0], artist=song[1]
+        ).first()
+
+        await self.add_file(song)
 
     async def _add(self, file_info: Union[Song, Episode, None],
                    source: AudioSource,
@@ -374,6 +412,7 @@ class AudioPlayer:
             raise ClientException('Voice client is not set')
 
         item = QueuedItem(file_info, source, live_stream)
+        self.upcoming.append(item.item)
         await self._queue.put(item)
 
     def _song_end(self, error: Optional[Exception] = None) -> None:
@@ -383,8 +422,11 @@ class AudioPlayer:
     async def _reset_live_stream(self) -> None:
         """ Stop and restart the existing HLS live stream """
 
-        if self._live_reset_counter < 5:
+        if self._live_reset_counter < 5 and self._live_stream is not None:
             await self.stop(disconnect=False)
+
+            if os.path.exists(self._live_stream.archive_file):
+                os.remove(self._live_stream.archive_file)
 
             source = FFmpegPCMAudio(
                 self._live_stream.stream_url,
@@ -404,6 +446,7 @@ class AudioPlayer:
             self._event.clear()
             self._current = await self._queue.get()
 
+            self.upcoming.pop(0)
             self.recent.insert(0, self._current.item)
             self.recent = self.recent[:10]
 
@@ -437,6 +480,10 @@ class AudioPlayer:
             self._voice.play(self._current.source, after=self._song_end)
 
             await self._event.wait()
+
+            if self._playlist_channel is not None and \
+                    self._queue.qsize() < 5:
+                await self._add_random_playlist_song()
             self._current = None
 
     async def _update(self) -> None:

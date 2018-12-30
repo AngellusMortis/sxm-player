@@ -4,11 +4,10 @@ import time
 import traceback
 from typing import List
 
-from sqlalchemy.orm.session import Session
 from sxm.models import XMMarker
 
 from .models import Episode, Song, XMState
-from .utils import get_air_time, get_files, init_db, splice_file
+from .utils import get_air_time, get_files, splice_file
 
 __all__ = ['run_processor']
 
@@ -30,9 +29,8 @@ def path_filter(word: str) -> str:
         .strip()
 
 
-def process_cut(archives: List[str], db: Session, cut: XMMarker,
-                output_folder: str, active_channel_id: str,
-                is_song: bool = True) -> bool:
+def process_cut(archives: List[str], state: XMState,
+                cut: XMMarker, is_song: bool = True) -> bool:
     """ Processes `archives` to splice out an
         instance of `XMMarker` if it exists """
 
@@ -58,7 +56,8 @@ def process_cut(archives: List[str], db: Session, cut: XMMarker,
         album_or_show = None
         artist = None
         filename = None
-        folder = None
+        folder = os.path.join(
+            state.processed_folder, state.active_channel_id)
 
         air_time = get_air_time(cut)
 
@@ -70,10 +69,7 @@ def process_cut(archives: List[str], db: Session, cut: XMMarker,
                 album_or_show = path_filter(cut.cut.album.title)
 
             filename = f'{title}.{cut.guid}.mp3'
-            folder = os.path.join(output_folder, artist)
-
-            if album_or_show is not None:
-                folder = os.path.join(folder, album_or_show)
+            folder = os.path.join(folder, 'songs', artist)
         else:
             title = path_filter(cut.episode.long_title or
                                 cut.episode.medium_title)
@@ -84,10 +80,10 @@ def process_cut(archives: List[str], db: Session, cut: XMMarker,
 
             filename = \
                 f'{title}.{air_time.strftime("%Y-%m-%d-%H.%M")}.{cut.guid}.mp3'
-            folder = output_folder
+            folder = os.path.join(folder, 'shows')
 
-            if album_or_show is not None:
-                folder = os.path.join(folder, album_or_show)
+        if album_or_show is not None:
+            folder = os.path.join(folder, album_or_show)
 
         os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, filename)
@@ -110,7 +106,7 @@ def process_cut(archives: List[str], db: Session, cut: XMMarker,
                     artist=artist,
                     album=album_or_show,
                     air_time=air_time,
-                    channel=active_channel_id,
+                    channel=state.active_channel_id,
                     file_path=path
                 )
             else:
@@ -119,22 +115,26 @@ def process_cut(archives: List[str], db: Session, cut: XMMarker,
                     title=title,
                     show=album_or_show,
                     air_time=air_time,
-                    channel=active_channel_id,
+                    channel=state.active_channel_id,
                     file_path=path
                 )
 
-            db.add(db_item)
-            db.commit()
+            state.db.add(db_item)
+            state.db.commit()
             logger.debug(f'inserted cut {is_song}: {db_item.guid}')
             return True
     return False
 
 
-def process_cuts(archives: List[str], db: Session, output_folder: str,
-                 channel_id: str, cuts: List[XMMarker],
+def process_cuts(archives: List[str], state: XMState,
                  is_song: bool = True) -> int:
     """ Processes `archives` to splice out any
         instance of `XMMarker` if it exists """
+
+    if is_song:
+        cuts = state.live.song_cuts
+    else:
+        cuts = state.live.episode_markers
 
     processed = 0
     for cut in cuts:
@@ -143,7 +143,7 @@ def process_cuts(archives: List[str], db: Session, output_folder: str,
 
         db_item = None
         if is_song:
-            existing = db.query(Song).filter_by(
+            existing = state.db.query(Song).filter_by(
                 title=cut.cut.title,
                 artist=cut.cut.artists[0].name
             ).all()
@@ -151,9 +151,9 @@ def process_cuts(archives: List[str], db: Session, output_folder: str,
             if len(existing) >= MAX_DUPLICATE_COUNT:
                 continue
 
-            db_item = db.query(Song).filter_by(guid=cut.guid).first()
+            db_item = state.db.query(Song).filter_by(guid=cut.guid).first()
         else:
-            db_item = db.query(Episode).filter_by(guid=cut.guid).first()
+            db_item = state.db.query(Episode).filter_by(guid=cut.guid).first()
 
         if db_item is not None:
             continue
@@ -170,29 +170,22 @@ def process_cuts(archives: List[str], db: Session, output_folder: str,
             f'{cut.time}: {cut.duration}'
             f'{cut.guid}'
         )
-        success = process_cut(
-            archives, db, cut, output_folder, channel_id, is_song)
+        success = process_cut(archives, state, cut, is_song)
 
         if success:
             processed += 1
     return processed
 
 
-def run_processor(state_dict: dict, output_folder: str,
-                  reset_songs: bool) -> None:
+def run_processor(state_dict: dict, reset_songs: bool) -> None:
     """ Runs song/show processor look """
 
-    state = XMState(state_dict)
+    state = XMState(state_dict, db_reset=reset_songs)
 
-    processed_folder = os.path.join(output_folder, 'processed')
-    archive_folder = os.path.join(output_folder, 'archive')
+    os.makedirs(state.processed_folder, exist_ok=True)
+    os.makedirs(state.archive_folder, exist_ok=True)
 
-    os.makedirs(processed_folder, exist_ok=True)
-    os.makedirs(archive_folder, exist_ok=True)
-
-    db = init_db(processed_folder, True, reset_songs)
-
-    logger.info(f'processor started: {output_folder}')
+    logger.info(f'processor started: {state.output}')
     sleep_time = 10
     while True:
         time.sleep(sleep_time)
@@ -205,13 +198,8 @@ def run_processor(state_dict: dict, output_folder: str,
                     state.live is None:
                 continue
 
-            channel_archive = os.path.join(archive_folder, active_channel_id)
-            channel_folder = os.path.join(processed_folder, active_channel_id)
-
-            song_folder = os.path.join(channel_folder, 'songs')
-            shows_folder = os.path.join(channel_folder, 'shows')
-
-            os.makedirs(song_folder, exist_ok=True)
+            channel_archive = os.path.join(
+                state.archive_folder, state.active_channel_id)
 
             archives = {}
             archive_files = get_files(channel_archive)
@@ -222,17 +210,9 @@ def run_processor(state_dict: dict, output_folder: str,
                     channel_archive, archive_file)
             logger.debug(f'found {len(archives.keys())}')
 
-            processed_songs = process_cuts(
-                archives, db, song_folder,
-                active_channel_id, state.live.song_cuts,
-                is_song=True
-            )
+            processed_songs = process_cuts(archives, state, is_song=True)
 
-            processed_shows = process_cuts(
-                archives, db, shows_folder,
-                active_channel_id, state.live.episode_markers,
-                is_song=False
-            )
+            processed_shows = process_cuts(archives, state, is_song=False)
 
             logger.info(
                 f'processed: {processed_songs} songs, {processed_shows} shows')

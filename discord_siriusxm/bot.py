@@ -12,12 +12,10 @@ from discord.ext.commands import Bot, Context, command
 from tabulate import tabulate
 
 from sqlalchemy import or_
-from sqlalchemy.orm.session import Session
 from sxm.models import XMImage, XMSong
 
 from .models import Episode, LiveStreamInfo, Song, XMState
 from .player import AudioPlayer
-from .utils import init_db
 
 __all__ = ['run_bot']
 
@@ -42,24 +40,17 @@ class SiriusXMBotCog:
     _xm = None
     _bot = None
     _state = None
-    _output_folder = None
 
-    def __init__(self, bot: Bot, state_dict: dict,
-                 port: int, output_folder: str):
+    def __init__(self, bot: Bot, state_dict: dict, port: int):
 
         self._bot = bot
         self._state = BotState(state_dict, bot)
         self._log = logging.getLogger('discord_siriusxm.bot')
         self._proxy_base = f'http://127.0.0.1:{port}'
-        self._output_folder = output_folder
-
-        if self._output_folder is not None:
-            self._output_folder = os.path.join(self._output_folder, 'streams')
 
     def __unload(self):
         if self._state.player is not None:
             self._bot.loop.create_task(self._state.player.stop())
-        self._state.xm_state.reset_channel()
 
     @command(pass_context=True)
     async def channels(self, ctx: Context) -> None:
@@ -143,7 +134,6 @@ class SiriusXMBotCog:
 
         if self._state.player.is_playing:
             await self._state.player.stop()
-            self._state.xm_state.reset_channel()
 
             self._log.debug('stop: stopped')
             await channel.send(f'{author.mention} stopped playing music')
@@ -201,8 +191,6 @@ class SiriusXMBotCog:
             return
 
         if self._state.player.is_playing:
-            if self._state.xm_state.active_channel_id is not None:
-                self._state.xm_state.reset_channel()
             await self._state.player.stop(disconnect=False)
             await asyncio.sleep(0.5)
         else:
@@ -210,10 +198,10 @@ class SiriusXMBotCog:
 
         stream_file = None
         log_archive = ''
-        if self._output_folder is not None:
+        if self._state.xm_state.stream_folder is not None:
             log_archive = f': archiving'
             stream_file = os.path.join(
-                self._output_folder, f'{xm_channel.id}.mp3')
+                self._state.xm_state.stream_folder, f'{xm_channel.id}.mp3')
 
         live_stream = LiveStreamInfo(stream_file, xm_url, xm_channel)
         try:
@@ -390,7 +378,7 @@ class SiriusXMBotCog:
         if count > 10 or count < 1:
             self._log.debug('recent: invalid count')
             await channel.send(
-                f'{author.mention}, invalid count, must be between 1 and 1, '
+                f'{author.mention}, invalid count, must be between 1 and 10, '
                 f'exclusive'
             )
             return
@@ -413,18 +401,12 @@ class SiriusXMBotCog:
 
             await channel.send(message)
 
-    def _get_db(self) -> Session:
-        """ Gets song/show database connection """
-
-        return init_db(os.path.join(self._output_folder, '..', 'processed'))
-
     async def _search_archive(self, ctx: Context,
                               search: str, is_song: bool) -> None:
         """ Searches song/show database and responds with results """
 
         channel = ctx.message.channel
         author = ctx.message.author
-        db = self._get_db()
         search_type = 'shows'
         if is_song:
             search_type = 'songs'
@@ -439,13 +421,13 @@ class SiriusXMBotCog:
 
         items = None
         if is_song:
-            items = db.query(Song).filter(or_(
+            items = self._state.xm_state.db.query(Song).filter(or_(
                 Song.guid.ilike(f'{search}%'),
                 Song.title.ilike(f'{search}%'),
                 Song.artist.ilike(f'{search}%'),
             )).order_by(Song.air_time.desc())[:10]
         else:
-            items = db.query(Episode).filter(or_(
+            items = self._state.xm_state.db.query(Episode).filter(or_(
                 Episode.guid.ilike(f'{search}%'),
                 Episode.title.ilike(f'{search}%'),
                 Episode.show.ilike(f'{search}%')
@@ -497,7 +479,6 @@ class SiriusXMBotCog:
 
         channel = ctx.message.channel
         author = ctx.message.author
-        db = self._get_db()
         search_type = 'shows'
         if is_song:
             search_type = 'songs'
@@ -519,15 +500,16 @@ class SiriusXMBotCog:
             await ctx.invoke(self.summon)
 
         if self._state.xm_state.active_channel_id is not None:
-            self._state.xm_state.reset_channel()
             await self._state.player.stop(disconnect=False)
             await asyncio.sleep(0.5)
 
         db_item = None
         if is_song:
-            db_item = db.query(Song).filter_by(guid=guid).first()
+            db_item = self._state.xm_state.db.query(Song)\
+                .filter_by(guid=guid).first()
         else:
-            db_item = db.query(Episode).filter_by(guid=guid).first()
+            db_item = self._state.xm_state.db.query(Episode)\
+                .filter_by(guid=guid).first()
 
         if db_item is not None and not os.path.exists(db_item.file_path):
             self._log.warn(f'file does not exist: {db_item.file_path}')
@@ -573,9 +555,100 @@ class SiriusXMBotCog:
 
         await self._state.player.skip()
 
+    @command(pass_context=True, no_pm=True)
+    async def playlist(self, ctx: Context,
+                       channel_id: str = None, threshold: int = 40) -> None:
+        """ Play a random playlist from archived songs
+        for a SiriusXM channel """
 
-def run_bot(prefix: str, description: str, state_dict: dict, token: str,
-            port: int, output_folder: Optional[str] = None) -> None:
+        channel = ctx.message.channel
+        author = ctx.message.author
+
+        if author.voice is None:
+            self._log.debug('playlist: no channel')
+            await channel.send(
+                f'{author.mention}, you are not in a voice channel.')
+            return
+
+        if channel_id is None:
+            self._log.debug('playlist: missing')
+            await channel.send(f'{author.mention}, missing channel id.')
+            return
+
+        xm_channel = self._state.xm_state.get_channel(channel_id)
+        if xm_channel is None:
+            self._log.debug('playlist: invalid')
+            await channel.send(f'{author.mention}, `{channel_id}` is invalid')
+            return
+
+        unique_songs = self._state.xm_state.db\
+            .query(Song.title, Song.artist).distinct().all()
+
+        if len(unique_songs) < threshold:
+            self._log.debug('playlist: threshold')
+            await channel.send(
+                f'{author.mention}, `{channel_id}` does not have '
+                f'enough archived songs'
+            )
+            return
+
+        if self._state.player.is_playing:
+            await self._state.player.stop(disconnect=False)
+            await asyncio.sleep(0.5)
+        else:
+            await ctx.invoke(self.summon)
+
+        try:
+            await self._state.player.add_playlist(xm_channel)
+        except Exception:
+            self._log.error('error while trying to create playlist:')
+            self._log.error(traceback.format_exc())
+            await self._state.player.stop()
+            await channel.send(
+                f'{author.mention}, something went wrong starting playlist')
+        else:
+            await channel.send(
+                f'{author.mention} starting playing a playlist of random '
+                f'songs from **{xm_channel.pretty_name}** in '
+                f'**{author.voice.channel.mention}**'
+            )
+
+    @command(pass_context=True, no_pm=True)
+    async def upcoming(self, ctx: Context) -> None:
+        """ Displaying the songs/shows on play queue. Does not
+        work for live SiriusXM radio """
+
+        channel = ctx.message.channel
+        channel = ctx.message.channel
+        author = ctx.message.author
+
+        if not self._state.player.is_playing:
+            self._log.debug('upcoming: nothing')
+            await channel.send(f'{author.mention}, nothing is playing')
+            return
+
+        if self._state.xm_state.active_channel_id is not None:
+            await channel.send(
+                f'{author.mention}, live radio playing, cannot get upcoming')
+        else:
+            message = (
+                f'{author.mention}\n\n'
+                f'Upcoming songs/shows:\n\n'
+            )
+
+            index = 1
+            for item in self._state.player.upcoming:
+                if item == self._state.player.current:
+                    message += f'next: {item.bold_name}\n'
+                else:
+                    message += f'{index}: {item.bold_name}\n'
+                index += 1
+
+            await channel.send(message)
+
+
+def run_bot(prefix: str, description: str, state_dict: dict,
+            token: str, port: int) -> None:
     """ Runs SiriusXM Discord bot """
 
     bot = Bot(
@@ -583,13 +656,16 @@ def run_bot(prefix: str, description: str, state_dict: dict, token: str,
         description=description,
         pm_help=True
     )
-    bot.add_cog(SiriusXMBotCog(bot, state_dict, port, output_folder))
+    bot.add_cog(SiriusXMBotCog(bot, state_dict, port))
 
-    if output_folder is None:
+    if state_dict['output'] is None:
         bot.remove_command('songs')
-        # bot.remove_command('song')
+        bot.remove_command('song')
         bot.remove_command('shows')
-        # bot.remove_command('show')
+        bot.remove_command('show')
+        bot.remove_command('skip')
+        bot.remove_command('playlist')
+        bot.remove_command('upcoming')
 
     logger = logging.getLogger('discord_siriusxm.bot')
 

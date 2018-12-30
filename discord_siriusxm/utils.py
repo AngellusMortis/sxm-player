@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
 from sxm.models import XMMarker
 
-from .models import Base, Episode, Song
+from .models import Episode, Song
 
 TRIM_VARIANCE = 0.05
 
@@ -19,6 +19,8 @@ logger = logging.getLogger('discord_siriusxm.utils')
 def init_db(base_folder: str, cleanup: Optional[bool] = True,
             reset: Optional[bool] = False) -> Session:
     """ Initializes song database connection """
+
+    from .models import Base
 
     os.makedirs(base_folder, exist_ok=True)
 

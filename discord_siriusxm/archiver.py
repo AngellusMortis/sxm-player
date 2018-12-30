@@ -63,18 +63,15 @@ def process_stream_file(abs_path: str, state: XMState,
     return None
 
 
-def run_archiver(state_dict: str, output_folder: str) -> None:
+def run_archiver(state_dict: str) -> None:
     """ Runs archiver loop """
 
     state = XMState(state_dict)
 
-    stream_folder = os.path.join(output_folder, 'streams')
-    archive_folder = os.path.join(output_folder, 'archive')
+    os.makedirs(state.stream_folder, exist_ok=True)
+    os.makedirs(state.archive_folder, exist_ok=True)
 
-    os.makedirs(stream_folder, exist_ok=True)
-    os.makedirs(archive_folder, exist_ok=True)
-
-    logger.info(f'stream archiver started: {output_folder}')
+    logger.info(f'stream archiver started: {state.output}')
     while True:
         time.sleep(600)
         try:
@@ -85,11 +82,12 @@ def run_archiver(state_dict: str, output_folder: str) -> None:
 
             deleted = 0
             archived = None
-            stream_files = get_files(stream_folder)
-            channel_archive = os.path.join(archive_folder, active_channel_id)
+            stream_files = get_files(state.stream_folder)
+            channel_archive = \
+                os.path.join(state.archive_folder, active_channel_id)
 
             for stream_file in stream_files:
-                abs_path = os.path.join(stream_folder, stream_file)
+                abs_path = os.path.join(state.stream_folder, stream_file)
                 file_parts = stream_file.split('.')
                 if file_parts[-1] != 'mp3' or \
                         file_parts[0] != active_channel_id:
