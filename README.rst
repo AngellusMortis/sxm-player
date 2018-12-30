@@ -2,8 +2,8 @@
 Discord SiriusXM Bot
 ====================
 
-.. image:: https://readthedocs.org/projects/discord-siriusxm/badge/?version=latest
-        :target: https://discord-siriusxm.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/siriusxm-discord-bot/badge/?version=latest
+        :target: https://siriusxm-discord-bot.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
 
@@ -12,7 +12,7 @@ A Discord bot that will play SiriusXM radio stations.
 
 
 * Free software: MIT license
-* Documentation: https://discord-siriusxm.readthedocs.io.
+* Documentation: https://siriusxm-discord-bot.readthedocs.io.
 
 
 Features
