@@ -6,8 +6,8 @@ import traceback
 from dataclasses import dataclass
 from typing import Optional
 
-import discord
-import humanize
+from humanize import naturaltime
+from discord import Embed, Message
 from discord.ext.commands import Bot, Context, command
 from tabulate import tabulate
 
@@ -37,9 +37,10 @@ class SiriusXMBotCog:
     """Discord bot cog for SiriusXM radio bot
     """
 
-    _xm = None
-    _bot = None
-    _state = None
+    _bot: Bot = None
+    _state: BotState = None
+    _log: logging.Logger = None
+    _proxy_base: str = None
 
     def __init__(self, bot: Bot, state_dict: dict, port: int):
 
@@ -272,7 +273,7 @@ class SiriusXMBotCog:
                         elif art.name == "image":
                             np_thumbnail = art.url
 
-        embed = discord.Embed(title=np_title)
+        embed = Embed(title=np_title)
         if np_author is not None:
             embed.set_author(name=np_author)
         if np_thumbnail is not None:
@@ -344,7 +345,7 @@ class SiriusXMBotCog:
             for song_cut in song_cuts:
                 seconds_ago = int((now-song_cut.time)/1000)
                 time_delta = datetime.timedelta(seconds=seconds_ago)
-                time_string = humanize.naturaltime(time_delta)
+                time_string = naturaltime(time_delta)
 
                 pretty_name = Song.get_pretty_name(
                     song_cut.cut.title,
@@ -582,7 +583,8 @@ class SiriusXMBotCog:
             xm_channel = self._state.xm_state.get_channel(channel_id)
             if xm_channel is None:
                 self._log.debug('playlist: invalid')
-                await channel.send(f'{author.mention}, `{channel_id}` is invalid')
+                await channel.send(
+                    f'{author.mention}, `{channel_id}` is invalid')
                 return
             xm_channels.append(xm_channel)
 
@@ -692,11 +694,11 @@ def run_bot(prefix: str, description: str, state_dict: dict,
     logger = logging.getLogger('discord_siriusxm.bot')
 
     @bot.event
-    async def on_ready():
+    async def on_ready() -> None:
         logger.info(f'logged in as {bot.user} (id: {bot.user.id})')
 
     @bot.event
-    async def on_message(message):
+    async def on_message(message: Message) -> None:
         ctx = await bot.get_context(message)
         author = ctx.message.author
         can_error = False

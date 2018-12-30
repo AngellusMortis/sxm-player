@@ -79,7 +79,7 @@ def main(username: str, password: str, token: str, prefix: str,
                 if output_folder is not None:
                     pool.apply_async(
                         func=run_archiver,
-                        args=(state))
+                        args=(state, ))
                     pool.apply_async(
                         func=run_processor,
                         args=(state, reset_songs))

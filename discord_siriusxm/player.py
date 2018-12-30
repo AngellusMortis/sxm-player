@@ -10,7 +10,7 @@ from typing import List, Optional, Union
 
 from discord import (AudioSource, ClientException, Game, PCMVolumeTransformer,
                      VoiceChannel, VoiceClient)
-from discord.ext import commands as discord_commands
+from discord.ext.commands import Bot
 from discord.opus import Encoder as OpusEncoder
 from discord.player import log
 
@@ -224,16 +224,16 @@ class DiscordAudioPlayer(threading.Thread):
 
 
 class AudioPlayer:
-    recent = None
-    upcoming = None
+    recent: List[Union[Episode, Song]] = None
+    upcoming: List[Union[Episode, Song]] = None
 
-    _log = None
+    _log: logging.Logger = None
     _current: AudioSource = None
     _voice: VoiceClient = None
-    _task = None
+    _task: asyncio.Task = None
     _queue: asyncio.Queue = asyncio.Queue()
     _event: asyncio.Event = asyncio.Event()
-    _bot: discord_commands.Bot = None
+    _bot: Bot = None
     _xm_state: XMState = None
     _volume: float = 0.25
 
@@ -246,7 +246,7 @@ class AudioPlayer:
     _playlist_channels: List[XMChannel] = None
     _random: SystemRandom = None
 
-    def __init__(self, bot: discord_commands.Bot, xm_state: XMState):
+    def __init__(self, bot: Bot, xm_state: XMState):
         self._bot = bot
         self._xm_state = xm_state
         self._log = logging.getLogger('discord_siriusxm.player')
@@ -266,7 +266,7 @@ class AudioPlayer:
 
         return self._voice.is_playing()
 
-    async def set_voice(self, channel) -> None:
+    async def set_voice(self, channel: VoiceChannel) -> None:
         """ Sets voice channel for audio player """
 
         if self._voice is None:
@@ -430,17 +430,9 @@ class AudioPlayer:
 
         if self._live_reset_counter < 5 and self._live_stream is not None:
             await self.stop(disconnect=False)
-
-            if os.path.exists(self._live_stream.archive_file):
-                os.remove(self._live_stream.archive_file)
-
-            source = FFmpegPCMAudio(
-                self._live_stream.stream_url,
-                before_options='-f hls',
-                after_options=self._live_stream.archive_file,
-            )
             self._live_reset_counter += 1
-            await self._add(None, source, self._live_stream)
+
+            await self.add_live_stream(self._live_stream)
         else:
             self._log.error(f'could not reset live stream')
             await self.stop()

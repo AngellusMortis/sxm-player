@@ -1,7 +1,8 @@
 import os
 import threading
 import time
-from typing import List, Union, Optional
+from typing import List, Optional, Union
+from datetime import datetime
 
 from discord import AudioSource, Game
 
@@ -16,16 +17,18 @@ Base = declarative_base()
 class Song(Base):
     __tablename__ = 'songs'
 
-    guid = Column(String, primary_key=True)
-    title = Column(String, index=True)
-    artist = Column(String, index=True)
-    album = Column(String, nullable=True)
-    air_time = Column(DateTime)
-    channel = Column(String)
-    file_path = Column(String)
+    guid: str = Column(String, primary_key=True)
+    title: str = Column(String, index=True)
+    artist: str = Column(String, index=True)
+    album: str = Column(String, nullable=True)
+    air_time: datetime = Column(DateTime)
+    channel: str = Column(String)
+    file_path: str = Column(String)
 
     @staticmethod
-    def get_pretty_name(title, artist, bold=False):
+    def get_pretty_name(title: str, artist: str, bold: bool = False) -> str:
+        """ Returns a formatted name of song """
+
         mod = ''
         if bold:
             mod = '**'
@@ -33,36 +36,56 @@ class Song(Base):
         return f'{mod}"{title}"{mod} by {mod}{artist}{mod}'
 
     @property
-    def pretty_name(self):
+    def pretty_name(self) -> str:
+        """ Returns a formatted name of song """
+
         return Song.get_pretty_name(self.title, self.artist)
 
     @property
-    def bold_name(self):
+    def bold_name(self) -> str:
+        """ Returns a formatted name of song """
+
         return Song.get_pretty_name(self.title, self.artist, True)
 
 
 class Episode(Base):
     __tablename__ = 'episodes'
 
-    guid = Column(String, primary_key=True)
-    title = Column(String, index=True)
-    show = Column(String, nullable=True, index=True)
-    air_time = Column(DateTime)
-    channel = Column(String)
-    file_path = Column(String)
+    guid: str = Column(String, primary_key=True)
+    title: str = Column(String, index=True)
+    show: str = Column(String, nullable=True, index=True)
+    air_time: datetime = Column(DateTime)
+    channel: str = Column(String)
+    file_path: str = Column(String)
+
+    @staticmethod
+    def get_pretty_name(title: str, show: str, air_time: str,
+                        bold: bool = False) -> str:
+        """ Returns a formatted name of show """
+
+        mod = ''
+        if bold:
+            mod = '**'
+
+        return f'{mod}"{title}"{mod} ({show}) from {air_time}'
 
     @property
-    def pretty_name(self):
-        return f'"{self.title}" ({self.show}) from {self.air_time}'
+    def pretty_name(self) -> str:
+        """ Returns a formatted name of show """
+
+        return Episode.get_pretty_name(self.title, self.artist, self.air_time)
 
     @property
-    def bold_name(self):
-        return f'**"{self.title}"** ({self.show}) from {self.air_time}'
+    def bold_name(self) -> str:
+        """ Returns a formatted name of show """
+
+        return Episode.get_pretty_name(
+            self.title, self.artist, self.air_time, True)
 
 
 class DictState:
     """Class that uses a shared memory dictionary to populate attributes"""
-    _state_dict = None
+    _state_dict: dict = None
 
     def __init__(self, state_dict: dict):
         self._state_dict = state_dict
@@ -74,7 +97,7 @@ class DictState:
             raise AttributeError("--%r object has no attribute %r" % (
                 type(self).__name__, attr))
 
-    def __setattr__(self, attr: str, value):
+    def __setattr__(self, attr: str, value) -> None:
         if self._state_dict is not None and attr in self._state_dict:
             self._state_dict[attr] = value
         super().__setattr__(attr, value)
@@ -92,9 +115,9 @@ class LiveStreamInfo:
 
 
 class QueuedItem:
-    item = None
+    item: Union[Song, Episode, None] = None
     source: AudioSource = None
-    live: LiveStreamInfo = None
+    live: Optional[LiveStreamInfo] = None
 
     def __init__(self, item: Union[Song, Episode, None], source: AudioSource,
                  live: Optional[LiveStreamInfo] = None):
@@ -104,18 +127,20 @@ class QueuedItem:
 
 
 class FakeClient:
-    _connected = None
+    _connected: threading.Event = None
 
     def __init__(self):
         self._connected = threading.Event()
         self._connected.set()
 
-    def send_audio_packet(self, data, *, encode=True):
+    def send_audio_packet(self, data, *, encode=True) -> None:
         pass
 
 
 class SiriusXMActivity(Game):
-    def __init__(self, start, radio_time, channel, live_channel, **kwargs):
+    def __init__(self, start: int, radio_time: int,
+                 channel: XMChannel, live_channel: XMLiveChannel, **kwargs):
+
         self.timestamps = {'start': start}
         self._start = start
         self.details = 'Test'
@@ -131,7 +156,10 @@ class SiriusXMActivity(Game):
 
         self.update_status(channel, live_channel, radio_time)
 
-    def update_status(self, channel, live_channel, radio_time):
+    def update_status(self, channel: XMChannel,
+                      live_channel: XMLiveChannel, radio_time: int) -> None:
+        """ Updates activity object from current channel playing """
+
         self.state = "Playing music from SiriusXM"
         self.name = f'SiriusXM {channel.pretty_name}'
         self.large_image_url = None
@@ -159,12 +187,12 @@ class SiriusXMActivity(Game):
 
 class XMState(DictState):
     """Class to store state SiriusXM Radio player for Discord Bot"""
-    _channels = None
-    _live_update_time = None
-    _live = None
-    _archive_folder = None
-    _processed_folder = None
-    _stream_folder = None
+    _channels: List[XMChannel] = None
+    _live_update_time: int = None
+    _live: XMLiveChannel = None
+    _archive_folder: str = None
+    _processed_folder: str = None
+    _stream_folder: str = None
 
     _db: Session = None
     _db_reset: bool = False
@@ -174,7 +202,10 @@ class XMState(DictState):
         self._db_reset = False
 
     @staticmethod
-    def init_state(state_dict: dict):
+    def init_state(state_dict: dict) -> None:
+        """ Initializes a dictionary that will be used
+        for a `XMState` object """
+
         state_dict['active_channel_id'] = None
         state_dict['channels'] = []
         state_dict['start_time'] = None
@@ -186,6 +217,8 @@ class XMState(DictState):
 
     @property
     def channels(self) -> List[XMChannel]:
+        """ Returns list of `XMChannel` """
+
         if self._channels is None:
             self._channels = []
             for channel in self._state_dict['channels']:
@@ -193,12 +226,16 @@ class XMState(DictState):
         return self._channels
 
     @channels.setter
-    def channels(self, value: dict):
+    def channels(self, value: dict) -> None:
+        """ Sets channel key in internal `state_dict`. """
+
         self._channels = None
         self._state_dict['channels'] = value
 
     @property
-    def live(self) -> XMLiveChannel:
+    def live(self) -> Union[XMLiveChannel, None]:
+        """ Returns current `XMLiveChannel` """
+
         last_update = self._state_dict['live_update_time']
         now = int(time.time() * 1000)
         if self._live is None or \
@@ -220,7 +257,9 @@ class XMState(DictState):
         return self._live
 
     @live.setter
-    def live(self, value: dict):
+    def live(self, value: dict) -> None:
+        """ Sets live key in internal `state_dict`. """
+
         self._live = None
         self._state_dict['start_time'] = None
         self._state_dict['live'] = value
@@ -228,19 +267,25 @@ class XMState(DictState):
             self._state_dict['live_update_time'] = time.time()
 
     @property
-    def radio_time(self):
+    def radio_time(self) -> Union[int, None]:
+        """ Returns current time for the radio """
+
         if self.live is None:
             return None
         # still working on offset:  - self.time_offset
         return int(time.time() * 1000)
 
     @property
-    def start_time(self):
+    def start_time(self) -> Union[int, None]:
+        """ Returns the start time for the current SiriusXM channel """
+
         if self.live is None:
             return None
         return self._state_dict['start_time']
 
-    def get_channel(self, name):
+    def get_channel(self, name: str) -> Union[XMChannel, None]:
+        """ Returns channel from list of `channels` with given name """
+
         name = name.lower()
         for channel in self.channels:
             if channel.name.lower() == name or \
@@ -249,37 +294,47 @@ class XMState(DictState):
                 return channel
         return None
 
-    def set_channel(self, channel_id):
+    def set_channel(self, channel_id: str) -> None:
+        """ Sets active SiriusXM channel """
+
         self.active_channel_id = channel_id
         self.live = None
 
-    def reset_channel(self):
+    def reset_channel(self) -> None:
+        """ Removes active SiriusXM channel """
+
         self.active_channel_id = None
         self.live = None
 
     @property
-    def archive_folder(self):
+    def archive_folder(self) -> Union[str, None]:
+        """ Returns path to archive folder """
+
         if self._archive_folder is None:
             if self.output is not None:
                 self._archive_folder = os.path.join(self.output, 'archive')
         return self._archive_folder
 
     @property
-    def processed_folder(self):
+    def processed_folder(self) -> Union[str, None]:
+        """ Returns path to processed folder """
+
         if self._processed_folder is None:
             if self.output is not None:
                 self._processed_folder = os.path.join(self.output, 'processed')
         return self._processed_folder
 
     @property
-    def stream_folder(self):
+    def stream_folder(self) -> Union[str, None]:
+        """ Returns path to stream folder """
+
         if self._stream_folder is None:
             if self.output is not None:
                 self._stream_folder = os.path.join(self.output, 'streams')
         return self._stream_folder
 
     @property
-    def db(self):
+    def db(self) -> Union[Session, None]:
         if self._db is None and self.output is not None:
             from .utils import init_db
 
