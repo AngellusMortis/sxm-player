@@ -2,21 +2,9 @@
 Discord SiriusXM Bot
 ====================
 
-
-.. image:: https://img.shields.io/pypi/v/discord_siriusxm.svg
-        :target: https://pypi.python.org/pypi/discord_siriusxm
-
-.. image:: https://img.shields.io/travis/AngellusMortis/discord_siriusxm.svg
-        :target: https://travis-ci.org/AngellusMortis/discord_siriusxm
-
 .. image:: https://readthedocs.org/projects/discord-siriusxm/badge/?version=latest
         :target: https://discord-siriusxm.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
-
-
-.. image:: https://pyup.io/repos/github/AngellusMortis/discord_siriusxm/shield.svg
-     :target: https://pyup.io/repos/github/AngellusMortis/discord_siriusxm/
-     :alt: Updates
 
 
 
@@ -30,7 +18,10 @@ A Discord bot that will play SiriusXM radio stations.
 Features
 --------
 
-* TODO
+* Runs a Discord bot that can play SiriusXM channel
+* Can archive live streams from a channel and process any songs/shows from it
+* Can ad-hoc playback any saved archives of songs/shows
+* Can creaste an inifinit random playlist of archived songs
 
 Credits
 -------

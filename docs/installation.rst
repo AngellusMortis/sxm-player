@@ -5,47 +5,14 @@ Installation
 ============
 
 
-Stable release
---------------
+Github
+------
 
-To install Discord SiriusXM Bot, run this command in your terminal:
-
-.. code-block:: console
-
-    $ pip install discord_siriusxm
-
-This is the preferred method to install Discord SiriusXM Bot, as it will always install the most recent stable release.
-
-If you don't have `pip`_ installed, this `Python installation guide`_ can guide
-you through the process.
-
-.. _pip: https://pip.pypa.io
-.. _Python installation guide: http://docs.python-guide.org/en/latest/starting/installation/
-
-
-From sources
-------------
-
-The sources for Discord SiriusXM Bot can be downloaded from the `Github repo`_.
-
-You can either clone the public repository:
+`discord-siriusxm` is not avaible on PyPi quite yet and some of its depenencies
+are not yet either. As a result installting it is a bit more difficult.
 
 .. code-block:: console
 
     $ git clone git://github.com/AngellusMortis/discord_siriusxm
-
-Or download the `tarball`_:
-
-.. code-block:: console
-
-    $ curl  -OL https://github.com/AngellusMortis/discord_siriusxm/tarball/master
-
-Once you have a copy of the source, you can install it with:
-
-.. code-block:: console
-
+    $ cd discord_siriusxm
     $ python setup.py install
-
-
-.. _Github repo: https://github.com/AngellusMortis/discord_siriusxm
-.. _tarball: https://github.com/AngellusMortis/discord_siriusxm/tarball/master
