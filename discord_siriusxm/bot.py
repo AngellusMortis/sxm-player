@@ -559,7 +559,8 @@ class SiriusXMBotCog:
     async def playlist(self, ctx: Context,
                        channel_id: str = None, threshold: int = 40) -> None:
         """ Play a random playlist from archived songs
-        for a SiriusXM channel """
+        for a SiriusXM channel. Can use comma seperated list of channel_ids
+        to play from multiple channels (max 5 channels) """
 
         channel = ctx.message.channel
         author = ctx.message.author
@@ -575,14 +576,26 @@ class SiriusXMBotCog:
             await channel.send(f'{author.mention}, missing channel id.')
             return
 
-        xm_channel = self._state.xm_state.get_channel(channel_id)
-        if xm_channel is None:
-            self._log.debug('playlist: invalid')
-            await channel.send(f'{author.mention}, `{channel_id}` is invalid')
+        channel_ids = channel_id.split(',')
+        xm_channels = []
+        for channel_id in channel_ids:
+            xm_channel = self._state.xm_state.get_channel(channel_id)
+            if xm_channel is None:
+                self._log.debug('playlist: invalid')
+                await channel.send(f'{author.mention}, `{channel_id}` is invalid')
+                return
+            xm_channels.append(xm_channel)
+
+        if len(xm_channels) > 5:
+            self._log.debug('playlist: too many')
+            await channel.send(f'{author.mention}, too many channel IDs')
             return
 
+        channel_ids = [x.id for x in xm_channels]
         unique_songs = self._state.xm_state.db\
-            .query(Song.title, Song.artist).distinct().all()
+            .query(Song.title, Song.artist)\
+            .filter(Song.channel.in_(channel_ids))\
+            .distinct().all()
 
         if len(unique_songs) < threshold:
             self._log.debug('playlist: threshold')
@@ -599,7 +612,7 @@ class SiriusXMBotCog:
             await ctx.invoke(self.summon)
 
         try:
-            await self._state.player.add_playlist(xm_channel)
+            await self._state.player.add_playlist(xm_channels)
         except Exception:
             self._log.error('error while trying to create playlist:')
             self._log.error(traceback.format_exc())
@@ -607,11 +620,20 @@ class SiriusXMBotCog:
             await channel.send(
                 f'{author.mention}, something went wrong starting playlist')
         else:
-            await channel.send(
-                f'{author.mention} starting playing a playlist of random '
-                f'songs from **{xm_channel.pretty_name}** in '
-                f'**{author.voice.channel.mention}**'
-            )
+            if len(xm_channels) == 1:
+                await channel.send(
+                    f'{author.mention} starting playing a playlist of random '
+                    f'songs from **{xm_channel.pretty_name}** in '
+                    f'**{author.voice.channel.mention}**'
+                )
+            else:
+                channel_nums = ', '.join(
+                    [f'#{x.channel_number}' for x in xm_channels])
+                await channel.send(
+                    f'{author.mention} starting playing a playlist of random '
+                    f'songs from **{channel_nums}** in '
+                    f'**{author.voice.channel.mention}**'
+                )
 
     @command(pass_context=True, no_pm=True)
     async def upcoming(self, ctx: Context) -> None:

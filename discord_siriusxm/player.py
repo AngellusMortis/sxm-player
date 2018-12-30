@@ -6,7 +6,7 @@ import subprocess
 import threading
 import time
 from random import SystemRandom
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from discord import (AudioSource, ClientException, Game, PCMVolumeTransformer,
                      VoiceChannel, VoiceClient)
@@ -14,6 +14,7 @@ from discord.ext import commands as discord_commands
 from discord.opus import Encoder as OpusEncoder
 from discord.player import log
 
+from sqlalchemy import and_
 from sxm.models import XMChannel
 
 from .models import (Episode, LiveStreamInfo, QueuedItem, SiriusXMActivity,
@@ -242,7 +243,7 @@ class AudioPlayer:
     _live_source: AudioSource = None
     _live_player: DiscordAudioPlayer = None
 
-    _playlist_channel: XMChannel = None
+    _playlist_channels: List[XMChannel] = None
     _random: SystemRandom = None
 
     def __init__(self, bot: discord_commands.Bot, xm_state: XMState):
@@ -309,8 +310,8 @@ class AudioPlayer:
         while not self._queue.empty():
             self._queue.get_nowait()
 
-        if self._playlist_channel is not None:
-            self._playlist_channel = None
+        if self._playlist_channels is not None:
+            self._playlist_channels = None
 
         if self._current is not None:
             self._current.source.cleanup()
@@ -361,10 +362,10 @@ class AudioPlayer:
             return True
         return False
 
-    async def add_playlist(self, xm_channel: XMChannel) -> None:
+    async def add_playlist(self, xm_channels: List[XMChannel]) -> None:
         """ Creates a playlist of random songs from an channel """
 
-        self._playlist_channel = xm_channel
+        self._playlist_channels = xm_channels
 
         for x in range(5):
             await self._add_random_playlist_song()
@@ -392,14 +393,19 @@ class AudioPlayer:
         await self._add(file_info, source)
 
     async def _add_random_playlist_song(self) -> None:
+        channel_ids = [x.id for x in self._playlist_channels]
+
         songs = self._xm_state.db.query(Song.title, Song.artist)\
-            .filter_by(channel=self._playlist_channel.id).distinct().all()
+            .filter(Song.channel.in_(channel_ids))\
+            .distinct().all()
 
         song = self._random.choice(songs)
-        song = self._xm_state.db.query(Song).filter_by(
-            channel=self._playlist_channel.id,
-            title=song[0], artist=song[1]
-        ).first()
+        song = self._xm_state.db.query(Song)\
+            .filter(and_(
+                Song.channel.in_(channel_ids),
+                Song.title == song[0],
+                Song.artist == song[1],
+            )).first()
 
         await self.add_file(song)
 
@@ -481,7 +487,7 @@ class AudioPlayer:
 
             await self._event.wait()
 
-            if self._playlist_channel is not None and \
+            if self._playlist_channels is not None and \
                     self._queue.qsize() < 5:
                 await self._add_random_playlist_song()
             self._current = None

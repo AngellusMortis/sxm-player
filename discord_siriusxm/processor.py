@@ -200,6 +200,7 @@ def run_processor(state_dict: dict, reset_songs: bool) -> None:
 
             channel_archive = os.path.join(
                 state.archive_folder, state.active_channel_id)
+            os.makedirs(channel_archive, exist_ok=True)
 
             archives = {}
             archive_files = get_files(channel_archive)
