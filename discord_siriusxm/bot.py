@@ -475,7 +475,8 @@ class SiriusXMBotCog:
 
         await self._play_file(ctx, show_id, False)
 
-    async def _play_file(self, ctx: Context, guid: str, is_song: bool) -> None:
+    async def _play_file(self, ctx: Context, guid: str = None,
+                         is_song: bool = False) -> None:
         """ Queues a song/show file to be played """
 
         channel = ctx.message.channel
@@ -497,13 +498,6 @@ class SiriusXMBotCog:
             )
             return
 
-        if not self._state.player.is_playing:
-            await ctx.invoke(self.summon)
-
-        if self._state.xm_state.active_channel_id is not None:
-            await self._state.player.stop(disconnect=False)
-            await asyncio.sleep(0.5)
-
         db_item = None
         if is_song:
             db_item = self._state.xm_state.db.query(Song)\
@@ -520,6 +514,14 @@ class SiriusXMBotCog:
             await channel.send(
                 f'{author.mention}, invalid {search_type} id'
             )
+            return
+
+        if not self._state.player.is_playing:
+            await ctx.invoke(self.summon)
+
+        if self._state.xm_state.active_channel_id is not None:
+            await self._state.player.stop(disconnect=False)
+            await asyncio.sleep(0.5)
 
         try:
             self._log.info(f'play: {db_item.file_path}')

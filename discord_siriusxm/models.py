@@ -73,14 +73,14 @@ class Episode(Base):
     def pretty_name(self) -> str:
         """ Returns a formatted name of show """
 
-        return Episode.get_pretty_name(self.title, self.artist, self.air_time)
+        return Episode.get_pretty_name(self.title, self.show, self.air_time)
 
     @property
     def bold_name(self) -> str:
         """ Returns a formatted name of show """
 
         return Episode.get_pretty_name(
-            self.title, self.artist, self.air_time, True)
+            self.title, self.show, self.air_time, True)
 
 
 class DictState:

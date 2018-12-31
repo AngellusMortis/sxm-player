@@ -5,6 +5,7 @@ import shlex
 import subprocess
 import threading
 import time
+import traceback
 from random import SystemRandom
 from typing import List, Optional, Union
 
@@ -337,6 +338,7 @@ class AudioPlayer:
                 if self._task is not None:
                     self._task.cancel()
                 self._song_end()
+                self._log.error(traceback.format_exc())
                 await self._voice.disconnect()
                 self._voice = None
 
