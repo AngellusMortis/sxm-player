@@ -45,7 +45,7 @@ setup(
     description="A Discord bot that will play SiriusXM radio stations.",
     entry_points={
         'console_scripts': [
-            'discord_siriusxm=discord_siriusxm.cli:main',
+            'dsxm=discord_siriusxm.cli:main',
         ],
     },
     install_requires=requirements,
