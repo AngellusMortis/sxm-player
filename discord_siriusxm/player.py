@@ -338,7 +338,7 @@ class AudioPlayer:
                 if self._task is not None:
                     self._task.cancel()
                 self._song_end()
-                self._log.error(traceback.format_exc())
+                self._log.error('\n'.join(traceback.format_stack()))
                 await self._voice.disconnect()
                 self._voice = None
 
@@ -511,7 +511,8 @@ class AudioPlayer:
                             channel=xm_channel,
                             live_channel=self._xm_state.live,
                         )
-                    elif self._live_counter < 3:
+                    # channels updates every ~50 seconds
+                    elif self._live_counter < 11:
                         self._live_counter += 1
                     else:
                         self._live_counter = 0
