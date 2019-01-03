@@ -303,10 +303,9 @@ class AudioPlayer:
         if self._current is not None:
             self._current.source.volume = self._volume
 
-    async def stop(self, disconnect: bool = True) -> None:
+    async def stop(self, disconnect: bool = True,
+                   reset_live: bool = True) -> None:
         """ Stops the `AudioPlayer` """
-
-        self._xm_state.reset_channel()
 
         while not self._queue.empty():
             self._queue.get_nowait()
@@ -327,6 +326,9 @@ class AudioPlayer:
         if self._live_player is not None:
             self._live_player = None
 
+        if reset_live:
+            self._xm_state.reset_channel()
+
         if self._voice is not None:
             if self._voice.is_playing():
                 self._voice.stop()
@@ -338,7 +340,8 @@ class AudioPlayer:
                 if self._task is not None:
                     self._task.cancel()
                 self._song_end()
-                self._log.error('\n'.join(traceback.format_stack()))
+                self._log.debug('Voice disconnection stacktrace:')
+                self._log.debug('\n'.join(traceback.format_stack()))
                 await self._voice.disconnect()
                 self._voice = None
 
@@ -431,7 +434,7 @@ class AudioPlayer:
         """ Stop and restart the existing HLS live stream """
 
         if self._live_reset_counter < 5 and self._live_stream is not None:
-            await self.stop(disconnect=False)
+            await self.stop(disconnect=False, reset_live=False)
             self._live_reset_counter += 1
 
             await self.add_live_stream(self._live_stream)
@@ -520,7 +523,6 @@ class AudioPlayer:
                             f'could not retrieve live stream data, resetting')
                         await self._reset_live_stream()
                 else:
-                    self._log.error(self._live_reset_counter)
                     self._log.warn(f'live stream lost, resetting')
                     await self._reset_live_stream()
             elif self.is_playing:
