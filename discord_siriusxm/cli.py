@@ -22,6 +22,8 @@ from .server import run_server
               help='SiriusXM Username')
 @click.option('--password', type=str, prompt=True, hide_input=True,
               help='SiriusXM Password')
+@click.option('-r', '--region', type=click.Choice(['US', 'CA']), default='US',
+              help='Sets the SiriusXM client\'s region')
 @click.option('--token', type=str, prompt=True,
               help='Discord bot token')
 @click.option('--prefix', type=str, default='/sxm ',
@@ -44,7 +46,7 @@ from .server import run_server
               help='enable verbose logging (shows HTTP requests)')
 @click.option('-vv', '--debug', is_flag=True,
               help='enable debug logging')
-def main(username: str, password: str, token: str, prefix: str,
+def main(username: str, password: str, region: str, token: str, prefix: str,
          description: str, port: int, host: str, output_folder: str,
          reset_songs: bool, verbose: bool, debug: bool, log_file: str):
     """Command line interface for SiriusXM radio bot for Discord"""
@@ -86,7 +88,10 @@ def main(username: str, password: str, token: str, prefix: str,
 
                 pool.apply_async(
                     func=run_server,
-                    args=(state, port, host, username, password, request_level)
+                    args=(state, port, host,
+                          username, password, region,
+                          request_level,
+                         )
                 )
                 pool.apply(
                     func=run_bot,

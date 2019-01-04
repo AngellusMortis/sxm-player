@@ -19,7 +19,7 @@ class SiriusXMProxyServer:
     _state = None
 
     def __init__(self, state_dict: dict, port: int,
-                 ip: str, username: str, password: str):
+                 ip: str, username: str, password: str, region: str):
         self._port = port
         self._ip = ip
         self._state = XMState(state_dict)
@@ -29,6 +29,7 @@ class SiriusXMProxyServer:
             self._xm = SiriusXMClient(
                 username=username,
                 password=password,
+                region=region,
                 update_handler=self._make_update_handler()
             )
 
@@ -78,8 +79,9 @@ class SiriusXMProxyServer:
 
 
 def run_server(state_dict: dict, port: int, ip: str,
-               username: str, password: str, log_level: int) -> None:
+               username: str, password: str, region, log_level: int) -> None:
     """ Creates and runs SiriusXM proxy server """
 
-    server = SiriusXMProxyServer(state_dict, port, ip, username, password)
+    server = SiriusXMProxyServer(
+        state_dict, port, ip, username, password, region)
     server.run(log_level=log_level)
