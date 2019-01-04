@@ -31,6 +31,23 @@ optional, if you leave one off, you will be prompted:
 
     $ dsxm --username sxm_username
 
+Username, password, and Discord Bot token can also be passed via the
+`SXM_USERNAME`, `SXM_PASSWORD`, and `DISCORD_TOKEN` environment variables.
+
+.. code-block:: console
+
+    $ export SXM_USERNAME='sxm_username'
+    $ export SXM_PASSWORD='sxm_password'
+    $ export DISCORD_TOKEN='discord_bot_token'
+    $ dsxm
+
+If you are a SiriusXM subscriber in Canada, you will need to change your
+region to `CA`
+
+.. code-block:: console
+
+    $ dsxm -r CA
+
 By default, all of the bot commands are prefixed with `/sxm `, if you would
 like that to be something different, you can. This will set the command prefix
 to `$`.

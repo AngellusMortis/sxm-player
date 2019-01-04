@@ -19,12 +19,15 @@ from .server import run_server
 
 @click.command()
 @click.option('--username', type=str, prompt=True,
+              envvar='SXM_USERNAME',
               help='SiriusXM Username')
 @click.option('--password', type=str, prompt=True, hide_input=True,
+              envvar='SXM_PASSWORD',
               help='SiriusXM Password')
 @click.option('-r', '--region', type=click.Choice(['US', 'CA']), default='US',
               help='Sets the SiriusXM client\'s region')
 @click.option('--token', type=str, prompt=True,
+              envvar='DISCORD_TOKEN',
               help='Discord bot token')
 @click.option('--prefix', type=str, default='/sxm ',
               help='Discord bot command prefix')
