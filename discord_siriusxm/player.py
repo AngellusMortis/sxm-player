@@ -1,10 +1,7 @@
 import asyncio
 import logging
 import os
-import shlex
 import subprocess
-import threading
-import time
 import traceback
 from random import SystemRandom
 from typing import List, Optional, Union
@@ -12,216 +9,17 @@ from typing import List, Optional, Union
 from discord import (AudioSource, ClientException, Game, PCMVolumeTransformer,
                      VoiceChannel, VoiceClient)
 from discord.ext.commands import Bot
-from discord.opus import Encoder as OpusEncoder
-from discord.player import log
 
 from sqlalchemy import and_
 from sxm.models import XMChannel
 
+from .forked import DiscordAudioPlayer, FFmpegPCMAudio
 from .models import (Episode, LiveStreamInfo, QueuedItem, SiriusXMActivity,
-                     Song, XMState)
+                     Song, XMState, LiveState)
 
 # from discord.player import AudioPlayer as DiscordAudioPlayer
 
 __all__ = ['AudioPlayer']
-
-
-# TODO: try to get merged upstream
-class FFmpegPCMAudio(AudioSource):
-    """An audio source from FFmpeg (or AVConv).
-
-    This launches a sub-process to a specific input file given.
-
-    .. warning::
-
-        You must have the ffmpeg or avconv executable in your path environment
-        variable in order for this to work.
-
-    Parameters
-    ------------
-    source: Union[str, BinaryIO]
-        The input that ffmpeg will take and convert to PCM bytes.
-        If ``pipe`` is True then this is a file-like object that is
-        passed to the stdin of ffmpeg.
-    executable: str
-        The executable name (and path) to use. Defaults to ``ffmpeg``.
-    pipe: bool
-        If true, denotes that ``source`` parameter will be passed
-        to the stdin of ffmpeg. Defaults to ``False``.
-    stderr: Optional[BinaryIO]
-        A file-like object to pass to the Popen constructor.
-        Could also be an instance of ``subprocess.PIPE``.
-    options: Optional[str]
-        Extra command line arguments to pass to ffmpeg after the ``-i`` flag.
-    before_options: Optional[str]
-        Extra command line arguments to pass to ffmpeg before the ``-i`` flag.
-    after_options: Optional[str]
-        Extra command line arguments to pass to ffmpeg after everything else.
-
-    Raises
-    --------
-    ClientException
-        The subprocess failed to be created.
-    """
-
-    def __init__(self, source, *, executable='ffmpeg',
-                 pipe=False, stderr=None, before_options=None,
-                 options=None, after_options=None):
-        stdin = None if not pipe else source
-
-        args = [executable]
-
-        if isinstance(before_options, str):
-            args.extend(shlex.split(before_options))
-
-        args.append('-i')
-        args.append('-' if pipe else source)
-        args.extend(('-f', 's16le', '-ar', '48000', '-ac', '2', '-loglevel', 'warning'))
-
-        if isinstance(options, str):
-            args.extend(shlex.split(options))
-
-        args.append('pipe:1')
-
-        if isinstance(after_options, str):
-            args.extend(shlex.split(after_options))
-
-        self._process = None
-        try:
-            self._process = subprocess.Popen(args, stdin=stdin, stdout=subprocess.PIPE, stderr=stderr)
-            self._stdout = self._process.stdout
-        except FileNotFoundError:
-            raise ClientException(executable + ' was not found.') from None
-        except subprocess.SubprocessError as e:
-            raise ClientException('Popen failed: {0.__class__.__name__}: {0}'.format(e)) from e
-
-    def read(self):
-        ret = self._stdout.read(OpusEncoder.FRAME_SIZE)
-        if len(ret) != OpusEncoder.FRAME_SIZE:
-            return b''
-        return ret
-
-    def cleanup(self):
-        proc = self._process
-        if proc is None:
-            return
-
-        log.info('Preparing to terminate ffmpeg process %s.', proc.pid)
-        proc.kill()
-        if proc.poll() is None:
-            log.info('ffmpeg process %s has not terminated. Waiting to terminate...', proc.pid)
-            proc.communicate()
-            log.info('ffmpeg process %s should have terminated with a return code of %s.', proc.pid, proc.returncode)
-        else:
-            log.info('ffmpeg process %s successfully terminated with return code of %s.', proc.pid, proc.returncode)
-
-        self._process = None
-
-
-# TODO: Remove and go back to build Discord player
-class DiscordAudioPlayer(threading.Thread):
-    DELAY = OpusEncoder.FRAME_LENGTH / 1000.0
-
-    def __init__(self, source, client, *, after=None):
-        threading.Thread.__init__(self)
-        self.daemon = True
-        self.source = source
-        self.client = client
-        self.after = after
-
-        self._end = threading.Event()
-        self._resumed = threading.Event()
-        self._resumed.set() # we are not paused
-        self._current_error = None
-        self._connected = client._connected
-        self._lock = threading.Lock()
-
-        self._log = logging.getLogger('discord_siriusxm.player')
-
-        if after is not None and not callable(after):
-            raise TypeError('Expected a callable for the "after" parameter.')
-
-    def _do_run(self):
-        self.loops = 0
-        self._start = time.time()
-
-        # getattr lookup speed ups
-        play_audio = self.client.send_audio_packet
-
-        self._log.warn('player run')
-        while not self._end.is_set():
-            self._log.warn('player loop')
-            # are we paused?
-            if not self._resumed.is_set():
-                self._log.warn('player resume')
-                # wait until we aren't
-                self._resumed.wait()
-                continue
-
-            # are we disconnected from voice?
-            if not self._connected.is_set():
-                self._log.warn('player connected')
-                # wait until we are connected
-                self._connected.wait()
-                # reset our internal data
-                self.loops = 0
-                self._start = time.time()
-
-            self.loops += 1
-            data = self.source.read()
-
-            if not data:
-                self._log.warn('player stop')
-                self.stop()
-                break
-
-            self._log.warn('player play')
-            play_audio(data, encode=not self.source.is_opus())
-            next_time = self._start + self.DELAY * self.loops
-            delay = max(0, self.DELAY + (next_time - time.time()))
-            self._log.warn('player sleep')
-            time.sleep(delay)
-
-    def run(self):
-        try:
-            self._do_run()
-        except Exception as exc:
-            self._current_error = exc
-            self.stop()
-        finally:
-            self.source.cleanup()
-            self._call_after()
-
-    def _call_after(self):
-        if self.after is not None:
-            try:
-                self.after(self._current_error)
-            except Exception:
-                log.exception('Calling the after function failed.')
-
-    def stop(self):
-        self._end.set()
-        self._resumed.set()
-
-    def pause(self):
-        self._resumed.clear()
-
-    def resume(self):
-        self.loops = 0
-        self._start = time.time()
-        self._resumed.set()
-
-    def is_playing(self):
-        return self._resumed.is_set() and not self._end.is_set()
-
-    def is_paused(self):
-        return not self._end.is_set() and not self._resumed.is_set()
-
-    def _set_source(self, source):
-        with self._lock:
-            self.pause()
-            self.source = source
-            self.resume()
 
 
 class AudioPlayer:
@@ -238,11 +36,7 @@ class AudioPlayer:
     _xm_state: XMState = None
     _volume: float = 0.25
 
-    _live_counter: int = 0
-    _live_reset_counter: int = 0
-    _live_stream: LiveStreamInfo = None
-    _live_source: AudioSource = None
-    _live_player: DiscordAudioPlayer = None
+    _live: LiveState = None
 
     _playlist_channels: List[XMChannel] = None
     _random: SystemRandom = None
@@ -319,12 +113,9 @@ class AudioPlayer:
 
         self.recent = []
         self.upcoming = []
-        if self._live_source is not None:
-            self._live_source.cleanup()
-            self._live_source = None
 
-        if self._live_player is not None:
-            self._live_player = None
+        if self._live is not None:
+            self._live.reset_player()
 
         if reset_live:
             self._xm_state.reset_channel()
@@ -333,9 +124,10 @@ class AudioPlayer:
             if self._voice.is_playing():
                 self._voice.stop()
             if disconnect:
-                self._live_counter = 0
-                self._live_reset_counter = 0
-                self._live_stream = None
+                if self._live is not None:
+                    if self._live.stream is not None:
+                        self._bot.loop.remove_reader(self._live.stream.stderr)
+                    self._live = None
 
                 if self._task is not None:
                     self._task.cancel()
@@ -385,7 +177,12 @@ class AudioPlayer:
             live_stream.stream_url,
             before_options='-f hls',
             after_options=live_stream.archive_file,
+            stderr=subprocess.PIPE
         )
+        live_stream.stderr = source._process.stderr
+
+        self._bot.loop.add_reader(
+            live_stream.stderr, self._read_livestream_error)
         await self._add(None, source, live_stream)
 
     async def add_file(self, file_info: Union[Song, Episode]) -> None:
@@ -430,14 +227,23 @@ class AudioPlayer:
         """ Callback for `discord.AudioPlayer`/`discord.VoiceClient` """
         self._bot.loop.call_soon_threadsafe(self._event.set)
 
-    async def _reset_live_stream(self) -> None:
+    async def _reset_live_stream(self, delay: int = 0) -> None:
         """ Stop and restart the existing HLS live stream """
 
-        if self._live_reset_counter < 5 and self._live_stream is not None:
-            await self.stop(disconnect=False, reset_live=False)
-            self._live_reset_counter += 1
+        if self._live is None:
+            self._log.warn('No live stream to reset')
+            return
 
-            await self.add_live_stream(self._live_stream)
+        if self._live.is_reset_allowed:
+            if not self._live.resetting:
+                self._live.resetting = True
+                await self.stop(disconnect=False, reset_live=False)
+
+                if delay > 0:
+                    await asyncio.sleep(delay)
+
+                await self.add_live_stream(self._live.stream)
+                self._live.resetting = False
         else:
             self._log.error(f'could not reset live stream')
             await self.stop()
@@ -457,18 +263,24 @@ class AudioPlayer:
                 log_item = self._current.item.file_path
             else:
                 log_item = self._current.live.stream_url
-                self._live_stream = self._current.live
+
+                if self._live is None or \
+                        self._live.stream is None or \
+                        self._live.stream.stream_url != \
+                        self._current.live.stream_url:
+
+                    self._live = LiveState(stream=self._current.live)
                 # TODO: WIP
                 # code to try to get Discord to play from output .mp3 file for
                 # HLS streams at a few second delay instead of direct from
                 # stream to decrease skipping/buffering
                 # try:
-                #     self._live_source = self._current.source
-                #     self._live_player = DiscordAudioPlayer(
-                #         self._live_source,
+                #     self._live.source = self._current.source
+                #     self._live.player = DiscordAudioPlayer(
+                #         self._live.source,
                 #         FakeClient(),
                 #         after=self._song_end)
-                #     self._live_player.start()
+                #     self._live.player.start()
                 #     await asyncio.sleep(30)
 
                 #     self._current.source = FFmpegPCMAudio(
@@ -489,6 +301,23 @@ class AudioPlayer:
                 await self._add_random_playlist_song()
             self._current = None
 
+    def _read_livestream_error(self):
+        """ Bot task to read the stderr of a livestream that is playing """
+
+        if self._live is None:
+            self._log.warn('No live stream to read stderr')
+            return
+
+        if self._live.stream is not None:
+            line = self._live.stream.stderr.readline().decode('utf8')
+            if len(line) > 0:
+                if '503' in line:
+                    self._log.warn(
+                        'Recieving 503 errors from SiriusXM, pausing stream')
+                    self._bot.loop.create_task(self._reset_live_stream(10))
+                else:
+                    self._log.error(line)
+
     async def _update(self) -> None:
         """ Bot task update the state of the audio player """
 
@@ -506,8 +335,7 @@ class AudioPlayer:
 
                 if self.is_playing:
                     if self._xm_state.live is not None:
-                        self._live_counter = 0
-                        self._live_reset_counter = 0
+                        self._live.reset_counters()
                         activity = SiriusXMActivity(
                             start=self._xm_state.start_time,
                             radio_time=self._xm_state.radio_time,
@@ -515,14 +343,11 @@ class AudioPlayer:
                             live_channel=self._xm_state.live,
                         )
                     # channels updates every ~50 seconds
-                    elif self._live_counter < 11:
-                        self._live_counter += 1
-                    else:
-                        self._live_counter = 0
+                    elif self._live.is_live_missing:
                         self._log.warn(
                             f'could not retrieve live stream data, resetting')
                         await self._reset_live_stream()
-                else:
+                elif not self._live.resetting:
                     self._log.warn(f'live stream lost, resetting')
                     await self._reset_live_stream()
             elif self.is_playing:

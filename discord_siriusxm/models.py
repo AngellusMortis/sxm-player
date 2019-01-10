@@ -1,8 +1,9 @@
 import os
 import threading
 import time
-from typing import List, Optional, Union
+from dataclasses import dataclass
 from datetime import datetime
+from typing import BinaryIO, List, Optional, Union
 
 from discord import AudioSource, Game
 
@@ -10,6 +11,8 @@ from sqlalchemy import Column, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.session import Session
 from sxm.models import XMChannel, XMImage, XMLiveChannel, XMSong
+
+from .forked import DiscordAudioPlayer
 
 Base = declarative_base()
 
@@ -103,10 +106,12 @@ class DictState:
         super().__setattr__(attr, value)
 
 
+@dataclass
 class LiveStreamInfo:
-    archive_file: str = None
-    stream_url: str = None
-    channel: XMChannel = None
+    archive_file: str
+    stream_url: str
+    channel: XMChannel
+    stderr: BinaryIO = None
 
     def __init__(self, archive_file: str, stream_url: str, channel: XMChannel):
         self.archive_file = archive_file
@@ -114,16 +119,48 @@ class LiveStreamInfo:
         self.channel = channel
 
 
-class QueuedItem:
-    item: Union[Song, Episode, None] = None
-    source: AudioSource = None
-    live: Optional[LiveStreamInfo] = None
+@dataclass
+class LiveState:
+    _counter: int = 0
+    _reset_counter: int = 0
+    resetting: bool = False
 
-    def __init__(self, item: Union[Song, Episode, None], source: AudioSource,
-                 live: Optional[LiveStreamInfo] = None):
-        self.item = item
-        self.source = source
-        self.live = live
+    stream: LiveStreamInfo = None
+    source: AudioSource = None
+    player: DiscordAudioPlayer = None
+
+    def reset_player(self):
+        if self.source is not None:
+            self.source.cleanup()
+            self.source = None
+
+        if self.player is not None:
+            self.player = None
+
+    @property
+    def is_reset_allowed(self):
+        if self._reset_counter < 5 and self.stream is not None:
+            self._reset_counter += 1
+            return True
+        return False
+
+    @property
+    def is_live_missing(self):
+        if self._counter < 11:
+            self._counter += 1
+            return False
+        return True
+
+    def reset_counters(self):
+        self._counter = 0
+        self._reset_counter = 0
+
+
+@dataclass
+class QueuedItem:
+    item: Union[Song, Episode, None]
+    source: AudioSource
+    live: Optional[LiveStreamInfo]
 
 
 class FakeClient:
