@@ -2,13 +2,14 @@ import asyncio
 import datetime
 import logging
 import os
+import tempfile
 import traceback
 from dataclasses import dataclass
 from typing import Optional
 
-from humanize import naturaltime
 from discord import Embed, Message
 from discord.ext.commands import Bot, Context, command
+from humanize import naturaltime
 from tabulate import tabulate
 
 from sqlalchemy import or_
@@ -203,6 +204,8 @@ class SiriusXMBotCog:
             log_archive = f': archiving'
             stream_file = os.path.join(
                 self._state.xm_state.stream_folder, f'{xm_channel.id}.mp3')
+        else:
+            stream_file = os.path.join(tempfile.gettempdir(), f'{xm_channel.id}.mp3')
 
         live_stream = LiveStreamInfo(stream_file, xm_url, xm_channel)
         try:

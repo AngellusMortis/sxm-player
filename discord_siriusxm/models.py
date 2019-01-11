@@ -1,4 +1,5 @@
 import os
+import subprocess
 import threading
 import time
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.session import Session
 from sxm.models import XMChannel, XMImage, XMLiveChannel, XMSong
 
-from .forked import DiscordAudioPlayer
+from .forked import FFmpegPCMAudio
 
 Base = declarative_base()
 
@@ -111,12 +112,30 @@ class LiveStreamInfo:
     archive_file: str
     stream_url: str
     channel: XMChannel
-    stderr: BinaryIO = None
+    process: subprocess.Popen = None
+    source: AudioSource = None
 
     def __init__(self, archive_file: str, stream_url: str, channel: XMChannel):
         self.archive_file = archive_file
         self.stream_url = stream_url
         self.channel = channel
+
+        self.reset()
+
+    def reset(self) -> None:
+        """ Resets FFmpeg livestream """
+
+        if os.path.exists(self.archive_file):
+                os.remove(self.archive_file)
+
+        self.source = FFmpegPCMAudio(
+            self.stream_url,
+            before_options='-f hls',
+            after_options=self.archive_file,
+            stderr=subprocess.PIPE
+        )
+
+        self.process = self.source._process
 
 
 @dataclass
@@ -126,16 +145,12 @@ class LiveState:
     resetting: bool = False
 
     stream: LiveStreamInfo = None
-    source: AudioSource = None
-    player: DiscordAudioPlayer = None
 
     def reset_player(self):
-        if self.source is not None:
-            self.source.cleanup()
-            self.source = None
-
-        if self.player is not None:
-            self.player = None
+        if self.stream is not None and self.stream.source is not None:
+            self.stream.source.cleanup()
+            self.stream.source = None
+            self.stream.process = None
 
     @property
     def is_reset_allowed(self):

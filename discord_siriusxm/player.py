@@ -13,11 +13,9 @@ from discord.ext.commands import Bot
 from sqlalchemy import and_
 from sxm.models import XMChannel
 
-from .forked import DiscordAudioPlayer, FFmpegPCMAudio
+from .forked import FFmpegPCMAudio
 from .models import (Episode, LiveStreamInfo, QueuedItem, SiriusXMActivity,
                      Song, XMState, LiveState)
-
-# from discord.player import AudioPlayer as DiscordAudioPlayer
 
 __all__ = ['AudioPlayer']
 
@@ -125,8 +123,16 @@ class AudioPlayer:
                 self._voice.stop()
             if disconnect:
                 if self._live is not None:
-                    if self._live.stream is not None:
-                        self._bot.loop.remove_reader(self._live.stream.stderr)
+                    if self._live.stream is not None and \
+                            self._live.stream.source is not None:
+
+                        try:
+                            self._bot.loop.remove_reader(
+                                self._live.stream.process.stderr)
+                            self._bot.loop.remove_reader(
+                                self._live.stream.process.stdout)
+                        except ValueError:
+                            pass
                     self._live = None
 
                 if self._task is not None:
@@ -170,20 +176,12 @@ class AudioPlayer:
     async def add_live_stream(self, live_stream: LiveStreamInfo) -> None:
         """ Adds HLS live stream to playing queue """
 
-        if os.path.exists(live_stream.archive_file):
-                os.remove(live_stream.archive_file)
-
-        source = FFmpegPCMAudio(
-            live_stream.stream_url,
-            before_options='-f hls',
-            after_options=live_stream.archive_file,
-            stderr=subprocess.PIPE
-        )
-        live_stream.stderr = source._process.stderr
-
         self._bot.loop.add_reader(
-            live_stream.stderr, self._read_livestream_error)
-        await self._add(None, source, live_stream)
+            live_stream.process.stdout, self._read_livestream_out)
+        self._bot.loop.add_reader(
+            live_stream.process.stderr, self._read_livestream_error)
+
+        await self._add(None, live_stream.source, live_stream)
 
     async def add_file(self, file_info: Union[Song, Episode]) -> None:
         """ Adds file to playing queue """
@@ -242,11 +240,51 @@ class AudioPlayer:
                 if delay > 0:
                     await asyncio.sleep(delay)
 
+                self._live.stream.reset()
                 await self.add_live_stream(self._live.stream)
                 self._live.resetting = False
         else:
             self._log.error(f'could not reset live stream')
             await self.stop()
+
+    def _read_livestream(self, is_stdout: bool = True) -> Union[bytes, None]:
+        """ Bot task to read the output from ffmpeg process for livestream """
+
+        if self._live is None:
+            self._log.warn('No live stream to read')
+            return None
+
+        response = None
+        if self._live.stream is not None and \
+                self._live.stream.source is not None:
+
+            if is_stdout:
+                response = self._live.stream.source.read()
+            else:
+                response = self._live.stream.process.stderr.readline()
+
+        return response
+
+    def _read_livestream_out(self):
+        """ Bot task to read the stdout of a livestream that is playing """
+
+        self._read_livestream()
+
+    def _read_livestream_error(self):
+        """ Bot task to read the stderr of a livestream that is playing """
+
+        line = self._read_livestream(False)
+
+        if line is not None:
+            line = line.decode('utf8')
+
+            if len(line) > 0:
+                if '503' in line:
+                    self._log.warn(
+                        'Receiving 503 errors from SiriusXM, pausing stream')
+                    self._bot.loop.create_task(self._reset_live_stream(10))
+                else:
+                    self._log.error(line)
 
     async def _audio_player(self) -> None:
         """ Bot task to manage and run the audio player """
@@ -270,24 +308,14 @@ class AudioPlayer:
                         self._current.live.stream_url:
 
                     self._live = LiveState(stream=self._current.live)
-                # TODO: WIP
-                # code to try to get Discord to play from output .mp3 file for
-                # HLS streams at a few second delay instead of direct from
-                # stream to decrease skipping/buffering
-                # try:
-                #     self._live.source = self._current.source
-                #     self._live.player = DiscordAudioPlayer(
-                #         self._live.source,
-                #         FakeClient(),
-                #         after=self._song_end)
-                #     self._live.player.start()
-                #     await asyncio.sleep(30)
 
-                #     self._current.source = FFmpegPCMAudio(
-                #         self._current.live_stream_file,
-                #     )
-                # except Exception as e:
-                #     logger.error(f'{type(e).__name__}: {e}')
+                self._live.resetting = True
+                await asyncio.sleep(3)
+                self._current.source = FFmpegPCMAudio(
+                    self._current.live.archive_file,
+                    log_level='fatal',
+                )
+                self._live.resetting = False
 
             self._current.source = PCMVolumeTransformer(
                 self._current.source, volume=self._volume)
@@ -300,23 +328,6 @@ class AudioPlayer:
                     self._queue.qsize() < 5:
                 await self._add_random_playlist_song()
             self._current = None
-
-    def _read_livestream_error(self):
-        """ Bot task to read the stderr of a livestream that is playing """
-
-        if self._live is None:
-            self._log.warn('No live stream to read stderr')
-            return
-
-        if self._live.stream is not None:
-            line = self._live.stream.stderr.readline().decode('utf8')
-            if len(line) > 0:
-                if '503' in line:
-                    self._log.warn(
-                        'Recieving 503 errors from SiriusXM, pausing stream')
-                    self._bot.loop.create_task(self._reset_live_stream(10))
-                else:
-                    self._log.error(line)
 
     async def _update(self) -> None:
         """ Bot task update the state of the audio player """
