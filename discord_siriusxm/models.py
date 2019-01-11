@@ -1,10 +1,10 @@
 import os
 import subprocess
-import threading
+import asyncio
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import BinaryIO, List, Optional, Union
+from typing import List, Union
 
 from discord import AudioSource, Game
 
@@ -112,19 +112,25 @@ class LiveStreamInfo:
     archive_file: str
     stream_url: str
     channel: XMChannel
+    resetting: bool = False
+
     process: subprocess.Popen = None
     source: AudioSource = None
+
+    _counter: int = 0
+    _reset_counter: int = 0
 
     def __init__(self, archive_file: str, stream_url: str, channel: XMChannel):
         self.archive_file = archive_file
         self.stream_url = stream_url
         self.channel = channel
 
-        self.reset()
+    async def play(self) -> AudioSource:
+        """ Plays FFmpeg livestream """
 
-    def reset(self) -> None:
-        """ Resets FFmpeg livestream """
+        self.stop()
 
+        self._live.resetting = True
         if os.path.exists(self.archive_file):
                 os.remove(self.archive_file)
 
@@ -135,26 +141,28 @@ class LiveStreamInfo:
             stderr=subprocess.PIPE
         )
 
+        await asyncio.sleep(3)
         self.process = self.source._process
 
+        playback_source = FFmpegPCMAudio(
+            self.archive_file,
+            log_level='fatal',
+        )
 
-@dataclass
-class LiveState:
-    _counter: int = 0
-    _reset_counter: int = 0
-    resetting: bool = False
+        self._live.resetting = False
 
-    stream: LiveStreamInfo = None
+        return playback_source
 
-    def reset_player(self):
-        if self.stream is not None and self.stream.source is not None:
-            self.stream.source.cleanup()
-            self.stream.source = None
-            self.stream.process = None
+    def stop(self):
+        """ Stops FFmpeg livestream """
+        if self.source is not None:
+            self.source.cleanup()
+            self.source = None
+            self.process = None
 
     @property
     def is_reset_allowed(self):
-        if self._reset_counter < 5 and self.stream is not None:
+        if self._reset_counter < 5:
             self._reset_counter += 1
             return True
         return False
@@ -173,20 +181,10 @@ class LiveState:
 
 @dataclass
 class QueuedItem:
-    item: Union[Song, Episode, None]
-    source: AudioSource
-    live: Optional[LiveStreamInfo]
+    audio_file: Union[Song, Episode] = None
+    live: LiveStreamInfo = None
 
-
-class FakeClient:
-    _connected: threading.Event = None
-
-    def __init__(self):
-        self._connected = threading.Event()
-        self._connected.set()
-
-    def send_audio_packet(self, data, *, encode=True) -> None:
-        pass
+    source: AudioSource = None
 
 
 class SiriusXMActivity(Game):

@@ -15,7 +15,7 @@ from sxm.models import XMChannel
 
 from .forked import FFmpegPCMAudio
 from .models import (Episode, LiveStreamInfo, QueuedItem, SiriusXMActivity,
-                     Song, XMState, LiveState)
+                     Song, XMState)
 
 __all__ = ['AudioPlayer']
 
@@ -34,7 +34,7 @@ class AudioPlayer:
     _xm_state: XMState = None
     _volume: float = 0.25
 
-    _live: LiveState = None
+    _live: LiveStreamInfo = None
 
     _playlist_channels: List[XMChannel] = None
     _random: SystemRandom = None
@@ -70,10 +70,10 @@ class AudioPlayer:
 
     @property
     def current(self) -> Union[QueuedItem, None]:
-        """ Returns current `QueuedItem` that is being played """
+        """ Returns current `Song` or `Episode` that is being played """
 
         if self._current is not None:
-            return self._current.item
+            return self._current.audio_file
         return None
 
     @property
@@ -106,14 +106,15 @@ class AudioPlayer:
             self._playlist_channels = None
 
         if self._current is not None:
-            self._current.source.cleanup()
+            if self._current.source is not None:
+                self._current.source.cleanup()
             self._current = None
 
         self.recent = []
         self.upcoming = []
 
         if self._live is not None:
-            self._live.reset_player()
+            self._live.stop()
 
         if reset_live:
             self._xm_state.reset_channel()
@@ -122,22 +123,11 @@ class AudioPlayer:
             if self._voice.is_playing():
                 self._voice.stop()
             if disconnect:
-                if self._live is not None:
-                    if self._live.stream is not None and \
-                            self._live.stream.source is not None:
-
-                        try:
-                            self._bot.loop.remove_reader(
-                                self._live.stream.process.stderr)
-                            self._bot.loop.remove_reader(
-                                self._live.stream.process.stdout)
-                        except ValueError:
-                            pass
-                    self._live = None
 
                 if self._task is not None:
                     self._task.cancel()
                 self._song_end()
+                self._live = None
                 self._log.debug('Voice disconnection stacktrace:')
                 self._log.debug('\n'.join(traceback.format_stack()))
                 await self._voice.disconnect()
@@ -176,21 +166,12 @@ class AudioPlayer:
     async def add_live_stream(self, live_stream: LiveStreamInfo) -> None:
         """ Adds HLS live stream to playing queue """
 
-        self._bot.loop.add_reader(
-            live_stream.process.stdout, self._read_livestream_out)
-        self._bot.loop.add_reader(
-            live_stream.process.stderr, self._read_livestream_error)
-
-        await self._add(None, live_stream.source, live_stream)
+        await self._add(live_stream=live_stream)
 
     async def add_file(self, file_info: Union[Song, Episode]) -> None:
         """ Adds file to playing queue """
 
-        source = FFmpegPCMAudio(
-            file_info.file_path,
-        )
-
-        await self._add(file_info, source)
+        await self._add(file_info=file_info)
 
     async def _add_random_playlist_song(self) -> None:
         channel_ids = [x.id for x in self._playlist_channels]
@@ -209,21 +190,30 @@ class AudioPlayer:
 
         await self.add_file(song)
 
-    async def _add(self, file_info: Union[Song, Episode, None],
-                   source: AudioSource,
+    async def _add(self, file_info: Union[Song, Episode, None] = None,
                    live_stream: Optional[LiveStreamInfo] = None) -> None:
         """ Adds item to playing queue """
 
         if self._voice is None:
             raise ClientException('Voice client is not set')
 
-        item = QueuedItem(file_info, source, live_stream)
-        self.upcoming.append(item.item)
+        item = QueuedItem(audio_file=file_info, live=live_stream)
+        self.upcoming.append(item.audio_file)
         await self._queue.put(item)
 
     def _song_end(self, error: Optional[Exception] = None) -> None:
         """ Callback for `discord.AudioPlayer`/`discord.VoiceClient` """
+
         self._bot.loop.call_soon_threadsafe(self._event.set)
+
+        if self._live is not None and self._live.process is not None:
+            try:
+                self._bot.loop.remove_reader(
+                    self._live.process.stderr)
+                self._bot.loop.remove_reader(
+                    self._live.process.stdout)
+            except ValueError:
+                pass
 
     async def _reset_live_stream(self, delay: int = 0) -> None:
         """ Stop and restart the existing HLS live stream """
@@ -240,8 +230,7 @@ class AudioPlayer:
                 if delay > 0:
                     await asyncio.sleep(delay)
 
-                self._live.stream.reset()
-                await self.add_live_stream(self._live.stream)
+                await self.add_live_stream(self._live)
                 self._live.resetting = False
         else:
             self._log.error(f'could not reset live stream')
@@ -255,13 +244,13 @@ class AudioPlayer:
             return None
 
         response = None
-        if self._live.stream is not None and \
-                self._live.stream.source is not None:
+        if self._live is not None and \
+                self._live.source is not None:
 
             if is_stdout:
-                response = self._live.stream.source.read()
+                response = self._live.source.read()
             else:
-                response = self._live.stream.process.stderr.readline()
+                response = self._live.process.stderr.readline()
 
         return response
 
@@ -293,29 +282,26 @@ class AudioPlayer:
             self._event.clear()
             self._current = await self._queue.get()
 
-            self.upcoming.pop(0)
-            self.recent.insert(0, self._current.item)
-            self.recent = self.recent[:10]
+            if len(self.upcoming) > 0:
+                self.upcoming.pop(0)
 
-            if self._current.live is None:
-                log_item = self._current.item.file_path
+            if self._current.audio_file is not None:
+                self.recent.insert(0, self._current.audio_file)
+                self.recent = self.recent[:10]
+
+                log_item = self._current.audio_file.file_path
+                self._current.source = FFmpegPCMAudio(
+                    self._current.audio_file.file_path,
+                )
             else:
                 log_item = self._current.live.stream_url
+                self._live = self._current.live
+                self._current.source = await self._live.play()
 
-                if self._live is None or \
-                        self._live.stream is None or \
-                        self._live.stream.stream_url != \
-                        self._current.live.stream_url:
-
-                    self._live = LiveState(stream=self._current.live)
-
-                self._live.resetting = True
-                await asyncio.sleep(3)
-                self._current.source = FFmpegPCMAudio(
-                    self._current.live.archive_file,
-                    log_level='fatal',
-                )
-                self._live.resetting = False
+                self._bot.loop.add_reader(
+                    self._live.process.stdout, self._read_livestream_out)
+                self._bot.loop.add_reader(
+                    self._live.process.stderr, self._read_livestream_error)
 
             self._current.source = PCMVolumeTransformer(
                 self._current.source, volume=self._volume)
@@ -366,6 +352,6 @@ class AudioPlayer:
                     await self.stop()
                 else:
                     activity = Game(
-                        name=self._current.item.pretty_name)
+                        name=self._current.audio_file.pretty_name)
 
             await self._bot.change_presence(activity=activity)
