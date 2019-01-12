@@ -18,7 +18,7 @@ requirements = [
     'discord.py[voice]==1.0.0a0',
     'humanize',
     'sqlalchemy',
-    'sxm[async]==0.1.0',
+    'sxm==0.1.0',
     'tabulate',
 ]
 

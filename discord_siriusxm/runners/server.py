@@ -2,7 +2,7 @@ import logging
 from http.server import HTTPServer
 from typing import Callable
 
-from sxm import SiriusXMClient, make_sync_http_handler
+from sxm import SiriusXMClient, make_http_handler
 
 from .base import BaseRunner
 
@@ -57,7 +57,7 @@ class ServerRunner(BaseRunner):
 
         httpd = HTTPServer(
             (self._ip, self._port),
-            make_sync_http_handler(self.sxm, request_logger),
+            make_http_handler(self.sxm, request_logger),
         )
         try:
             self._log.info(
