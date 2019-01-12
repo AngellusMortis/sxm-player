@@ -161,10 +161,10 @@ class AudioPlayer:
         for x in range(5):
             await self._add_random_playlist_song()
 
-    async def add_live_stream(self, live_stream: LiveStreamInfo) -> None:
+    async def add_live_stream(self, channel: XMChannel) -> None:
         """ Adds HLS live stream to playing queue """
 
-        await self._add(live_stream=live_stream)
+        await self._add(channel=channel)
 
     async def add_file(self, file_info: Union[Song, Episode]) -> None:
         """ Adds file to playing queue """
@@ -189,12 +189,13 @@ class AudioPlayer:
         await self.add_file(song)
 
     async def _add(self, file_info: Union[Song, Episode, None] = None,
-                   live_stream: Optional[LiveStreamInfo] = None) -> None:
+                   channel: Optional[XMChannel] = None) -> None:
         """ Adds item to playing queue """
 
         if self._voice is None:
             raise ClientException('Voice client is not set')
 
+        live_stream = LiveStreamInfo(channel)
         item = QueuedItem(audio_file=file_info, live=live_stream)
         self.upcoming.append(item.audio_file)
         await self._queue.put(item)
@@ -285,7 +286,7 @@ class AudioPlayer:
                     self._current.audio_file.file_path,
                 )
             else:
-                log_item = self._current.live.stream_url
+                log_item = self._current.live.channel.id
                 self._live = self._current.live
                 try:
                     self._current.source = await self._live.play(

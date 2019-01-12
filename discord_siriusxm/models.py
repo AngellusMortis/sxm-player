@@ -150,121 +150,9 @@ class FakePlayer(threading.Thread):
 
 
 @dataclass
-class LiveStreamInfo:
-    archive_file: str
-    stream_url: str
-    channel: XMChannel
-    resetting: bool = False
-
-    process: subprocess.Popen = None
-    source: AudioSource = None
-
-    _counter: int = 0
-    _reset_counter: int = 0
-    _stream_player: FakePlayer = None
-
-    def __init__(self, archive_file: str, stream_url: str, channel: XMChannel):
-        self.archive_file = archive_file
-        self.stream_url = stream_url
-        self.channel = channel
-
-    async def play(self, stdout_callback: Callable,
-                   stderr_callback: Callable) -> AudioSource:
-        """ Plays FFmpeg livestream """
-
-        self.stop()
-
-        self.resetting = True
-        if os.path.exists(self.archive_file):
-            os.remove(self.archive_file)
-
-        self.source = FFmpegPCMAudio(
-            self.stream_url,
-            before_options='-f hls',
-            after_options=self.archive_file,
-            stderr=subprocess.PIPE
-        )
-        self.process = self.source._process
-
-        # self._stream_player = FakePlayer(self.source)
-        # self._stream_player.start()
-
-        loop = asyncio.get_event_loop()
-        loop.add_reader(self.process.stdout, stdout_callback)
-        loop.add_reader(self.process.stderr, stderr_callback)
-
-        start = time.time()
-        now = start
-        can_start = False
-        while not can_start and now - start < 30:
-            await asyncio.sleep(0.1)
-            now = time.time()
-            if os.path.exists(self.archive_file):
-                if os.path.getsize(self.archive_file) > 10000:
-                    can_start = True
-
-        if not can_start:
-            raise Exception('HLS archive file is not growing in size')
-
-        playback_source = FFmpegPCMAudio(
-            self.archive_file,
-            log_level='fatal',
-        )
-
-        self.resetting = False
-
-        return playback_source
-
-    def stop(self, bot: Bot = None) -> None:
-        """ Stops FFmpeg livestream """
-        # if self._stream_player is not None:
-        #     self._stream_player.stop()
-        #     self._stream_player = None
-
-        if self.source is not None:
-            try:
-                if bot is None:
-                    loop = asyncio.get_event_loop()
-                else:
-                    loop = bot.loop
-                loop.remove_reader(self.process.stdout)
-                loop.remove_reader(self.process.stderr)
-            except ValueError:
-                pass
-
-            try:
-                self.source.cleanup()
-            except OSError:
-                pass
-            self.source = None
-            self.process = None
-
-    @property
-    def is_reset_allowed(self):
-        if self._reset_counter < 5:
-            self._reset_counter += 1
-            return True
-        return False
-
-    @property
-    def is_live_missing(self):
-        if self.resetting:
-            return False
-
-        if self._counter < 11:
-            self._counter += 1
-            return False
-        return True
-
-    def reset_counters(self):
-        self._counter = 0
-        self._reset_counter = 0
-
-
-@dataclass
 class QueuedItem:
     audio_file: Union[Song, Episode] = None
-    live: LiveStreamInfo = None
+    channel: XMChannel = None
 
     source: AudioSource = None
 
@@ -339,6 +227,7 @@ class XMState(DictState):
         for a `XMState` object """
 
         state_dict['active_channel_id'] = None
+        state_dict['stream_file'] = None
         state_dict['channels'] = []
         state_dict['start_time'] = None
         state_dict['live'] = None
@@ -472,3 +361,138 @@ class XMState(DictState):
 
             self._db = init_db(self.processed_folder, self._db_reset)
         return self._db
+
+@dataclass
+class LiveStreamInfo:
+    channel: XMChannel
+    resetting: bool = False
+
+    process: subprocess.Popen = None
+    source: AudioSource = None
+
+    _counter: int = 0
+    _reset_counter: int = 0
+    _stream_player: FakePlayer = None
+
+    def __init__(self, channel: XMChannel):
+        self.channel = channel
+
+    async def play(self, state: XMState) -> AudioSource:
+        """ Plays FFmpeg livestream """
+
+        self.resetting = True
+
+        state.set_channel(self.channel)
+
+        start = time.time()
+        now = start
+        can_start = False
+        while not can_start and now - start < 30:
+            await asyncio.sleep(0.1)
+            now = time.time()
+            if os.path.exists(self.archive_file):
+                if os.path.getsize(self.archive_file) > 10000:
+                    can_start = True
+
+        if not can_start:
+            raise Exception('HLS archive file is not growing in size')
+
+        playback_source = FFmpegPCMAudio(
+            self.archive_file,
+            log_level='fatal',
+        )
+
+        self.resetting = False
+
+        return playback_source
+
+    # async def play(self, stdout_callback: Callable,
+    #                stderr_callback: Callable) -> AudioSource:
+    #     """ Plays FFmpeg livestream """
+
+    #     self.stop()
+
+    #     self.resetting = True
+    #     if os.path.exists(self.archive_file):
+    #         os.remove(self.archive_file)
+
+    #     self.source = FFmpegPCMAudio(
+    #         self.stream_url,
+    #         before_options='-f hls',
+    #         after_options=self.archive_file,
+    #         stderr=subprocess.PIPE
+    #     )
+    #     self.process = self.source._process
+
+    #     loop = asyncio.get_event_loop()
+    #     loop.add_reader(self.process.stdout, stdout_callback)
+    #     loop.add_reader(self.process.stderr, stderr_callback)
+
+    #     start = time.time()
+    #     now = start
+    #     can_start = False
+    #     while not can_start and now - start < 30:
+    #         await asyncio.sleep(0.1)
+    #         now = time.time()
+    #         if os.path.exists(self.archive_file):
+    #             if os.path.getsize(self.archive_file) > 10000:
+    #                 can_start = True
+
+    #     if not can_start:
+    #         raise Exception('HLS archive file is not growing in size')
+
+    #     playback_source = FFmpegPCMAudio(
+    #         self.archive_file,
+    #         log_level='fatal',
+    #     )
+
+    #     self.resetting = False
+
+    #     return playback_source
+
+    # def stop(self, bot: Bot = None) -> None:
+    #     """ Stops FFmpeg livestream """
+
+    #     if self.source is not None:
+    #         try:
+    #             if bot is None:
+    #                 loop = asyncio.get_event_loop()
+    #             else:
+    #                 loop = bot.loop
+    #             loop.remove_reader(self.process.stdout)
+    #             loop.remove_reader(self.process.stderr)
+    #         except ValueError:
+    #             pass
+
+    #         try:
+    #             self.source.cleanup()
+    #         except OSError:
+    #             pass
+    #         self.source = None
+    #         self.process = None
+
+    def stop(self, state: XMState) -> None:
+        """ Stops FFmpeg livestream """
+
+        state.reset_channel()
+
+    @property
+    def is_reset_allowed(self):
+        if self._reset_counter < 5:
+            self._reset_counter += 1
+            return True
+        return False
+
+    @property
+    def is_live_missing(self):
+        if self.resetting:
+            return False
+
+        if self._counter < 11:
+            self._counter += 1
+            return False
+        return True
+
+    def reset_counters(self):
+        self._counter = 0
+        self._reset_counter = 0

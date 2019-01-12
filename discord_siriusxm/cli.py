@@ -4,17 +4,15 @@
 import logging
 import signal
 import sys
+import time
 from multiprocessing import Manager, Pool
 
 import click
 
 import coloredlogs
 
-from .archiver import run_archiver
-from .bot import run_bot
 from .models import XMState
-from .processor import run_processor
-from .server import run_server
+from .runners import BotRunner, ServerRunner, run
 
 
 @click.command()
@@ -68,39 +66,65 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
     coloredlogs.install(level=level)
 
     with Manager() as manager:
-        state = manager.dict()
-        XMState.init_state(state)
+        state_dict = manager.dict()
+        XMState.init_state(state_dict)
 
-        process_count = 2
+        process_count = 3
         if output_folder is not None:
-            state['output'] = output_folder
-            process_count = 4
+            state_dict['output'] = output_folder
+            process_count = 5
 
         def init_worker():
             signal.signal(signal.SIGINT, signal.SIG_IGN)
 
         with Pool(processes=process_count, initializer=init_worker) as pool:
-            try:
-                if output_folder is not None:
-                    pool.apply_async(
-                        func=run_archiver,
-                        args=(state, ))
-                    pool.apply_async(
-                        func=run_processor,
-                        args=(state, reset_songs))
+            logger = logging.getLogger('discord_siriusxm')
 
-                pool.apply_async(
-                    func=run_server,
-                    args=(state, port, host,
-                          username, password, region,
-                          request_level,
-                         )
-                )
-                pool.apply(
-                    func=run_bot,
-                    args=(prefix, description, state,
-                          token, port)
-                )
+            pool.apply_async(
+                func=run, args=(ServerRunner, state_dict),
+                kwds={
+                    'port': port,
+                    'ip': host,
+                    'username': username,
+                    'password': password,
+                    'region': region,
+                    'request_log_level': request_level,
+                }
+            )
+
+            pool.apply_async(
+                func=run, args=(BotRunner, state_dict),
+                kwds={
+                    'prefix': prefix,
+                    'description': description,
+                    'token': token,
+                }
+            )
+
+            try:
+                while True:
+                    time.sleep(1)
+
+                # if output_folder is not None:
+                #     pool.apply_async(
+                #         func=run_archiver,
+                #         args=(state, ))
+                #     pool.apply_async(
+                #         func=run_processor,
+                #         args=(state, reset_songs))
+
+                # pool.apply_async(
+                #     func=run_server,
+                #     args=(state, port, host,
+                #           username, password, region,
+                #           request_level,
+                #          )
+                # )
+                # pool.apply_async(
+                #     func=run_bot,
+                #     args=(prefix, description, state,
+                #           token, port)
+                # )
                 pool.close()
                 pool.join()
             except KeyboardInterrupt:
