@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import os
-import subprocess
 import traceback
 from random import SystemRandom
 from typing import List, Optional, Union
@@ -54,7 +52,7 @@ class AudioPlayer:
     def is_playing(self) -> bool:
         """ Returns if `AudioPlayer` is playing audio """
 
-        if self._voice is None or self._voice is None:
+        if self._voice is None or self._current is None:
             return False
 
         return self._voice.is_playing()
@@ -205,15 +203,8 @@ class AudioPlayer:
         """ Callback for `discord.AudioPlayer`/`discord.VoiceClient` """
 
         self._bot.loop.call_soon_threadsafe(self._event.set)
-
-        if self._live is not None and self._live.process is not None:
-            try:
-                self._bot.loop.remove_reader(
-                    self._live.process.stderr)
-                self._bot.loop.remove_reader(
-                    self._live.process.stdout)
-            except ValueError:
-                pass
+        if self._live is not None:
+            self._live.stop(self._bot)
 
     async def _reset_live_stream(self, delay: int = 0) -> None:
         """ Stop and restart the existing HLS live stream """
@@ -254,12 +245,12 @@ class AudioPlayer:
 
         return response
 
-    def _read_livestream_out(self):
+    def _read_livestream_out(self) -> None:
         """ Bot task to read the stdout of a livestream that is playing """
 
         self._read_livestream()
 
-    def _read_livestream_error(self):
+    def _read_livestream_error(self) -> None:
         """ Bot task to read the stderr of a livestream that is playing """
 
         line = self._read_livestream(False)
@@ -296,12 +287,16 @@ class AudioPlayer:
             else:
                 log_item = self._current.live.stream_url
                 self._live = self._current.live
-                self._current.source = await self._live.play()
-
-                self._bot.loop.add_reader(
-                    self._live.process.stdout, self._read_livestream_out)
-                self._bot.loop.add_reader(
-                    self._live.process.stderr, self._read_livestream_error)
+                try:
+                    self._current.source = await self._live.play(
+                        self._read_livestream_out,
+                        self._read_livestream_error
+                    )
+                except Exception:
+                    self._log.error(
+                        'Exception while trying to play HLS stream:')
+                    self._log.error(traceback.format_exc())
+                    continue
 
             self._current.source = PCMVolumeTransformer(
                 self._current.source, volume=self._volume)

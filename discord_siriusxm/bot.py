@@ -531,7 +531,7 @@ class SiriusXMBotCog:
             await self._state.player.add_file(db_item)
         except Exception:
             self._log.error('error while trying to add file to play queue:')
-            self._log.error(traceback.format_stack())
+            self._log.error(traceback.format_exc())
         else:
             await channel.send(
                     f'{author.mention}, added {db_item.bold_name} '

@@ -1,12 +1,15 @@
+import asyncio
 import os
 import subprocess
-import asyncio
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Union
+from typing import Callable, List, Union
 
 from discord import AudioSource, Game
+from discord.ext.commands import Bot
+from discord.opus import Encoder as OpusEncoder
 
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
@@ -107,6 +110,45 @@ class DictState:
         super().__setattr__(attr, value)
 
 
+class FakePlayer(threading.Thread):
+    """ Striped down Discord Audio Player to play HLS """
+    DELAY = OpusEncoder.FRAME_LENGTH / 1000.0
+
+    def __init__(self, source):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.source = source
+
+        self._end = threading.Event()
+
+    def _do_run(self):
+        self.loops = 0
+        self._start = time.time()
+
+        while not self._end.is_set():
+            self.loops += 1
+            data = self.source.read()
+
+            if not data:
+                self.stop()
+                break
+            next_time = self._start + self.DELAY * self.loops
+            delay = max(0, self.DELAY + (next_time - time.time()))
+            time.sleep(delay)
+
+    def run(self):
+        try:
+            self._do_run()
+        except Exception as exc:
+            self._current_error = exc
+            self.stop()
+        finally:
+            self.source.cleanup()
+
+    def stop(self):
+        self._end.set()
+
+
 @dataclass
 class LiveStreamInfo:
     archive_file: str
@@ -119,20 +161,22 @@ class LiveStreamInfo:
 
     _counter: int = 0
     _reset_counter: int = 0
+    _stream_player: FakePlayer = None
 
     def __init__(self, archive_file: str, stream_url: str, channel: XMChannel):
         self.archive_file = archive_file
         self.stream_url = stream_url
         self.channel = channel
 
-    async def play(self) -> AudioSource:
+    async def play(self, stdout_callback: Callable,
+                   stderr_callback: Callable) -> AudioSource:
         """ Plays FFmpeg livestream """
 
         self.stop()
 
-        self._live.resetting = True
+        self.resetting = True
         if os.path.exists(self.archive_file):
-                os.remove(self.archive_file)
+            os.remove(self.archive_file)
 
         self.source = FFmpegPCMAudio(
             self.stream_url,
@@ -140,23 +184,58 @@ class LiveStreamInfo:
             after_options=self.archive_file,
             stderr=subprocess.PIPE
         )
-
-        await asyncio.sleep(3)
         self.process = self.source._process
+
+        # self._stream_player = FakePlayer(self.source)
+        # self._stream_player.start()
+
+        loop = asyncio.get_event_loop()
+        loop.add_reader(self.process.stdout, stdout_callback)
+        loop.add_reader(self.process.stderr, stderr_callback)
+
+        start = time.time()
+        now = start
+        can_start = False
+        while not can_start and now - start < 30:
+            await asyncio.sleep(0.1)
+            now = time.time()
+            if os.path.exists(self.archive_file):
+                if os.path.getsize(self.archive_file) > 10000:
+                    can_start = True
+
+        if not can_start:
+            raise Exception('HLS archive file is not growing in size')
 
         playback_source = FFmpegPCMAudio(
             self.archive_file,
             log_level='fatal',
         )
 
-        self._live.resetting = False
+        self.resetting = False
 
         return playback_source
 
-    def stop(self):
+    def stop(self, bot: Bot = None) -> None:
         """ Stops FFmpeg livestream """
+        # if self._stream_player is not None:
+        #     self._stream_player.stop()
+        #     self._stream_player = None
+
         if self.source is not None:
-            self.source.cleanup()
+            try:
+                if bot is None:
+                    loop = asyncio.get_event_loop()
+                else:
+                    loop = bot.loop
+                loop.remove_reader(self.process.stdout)
+                loop.remove_reader(self.process.stderr)
+            except ValueError:
+                pass
+
+            try:
+                self.source.cleanup()
+            except OSError:
+                pass
             self.source = None
             self.process = None
 
@@ -169,6 +248,9 @@ class LiveStreamInfo:
 
     @property
     def is_live_missing(self):
+        if self.resetting:
+            return False
+
         if self._counter < 11:
             self._counter += 1
             return False
