@@ -66,7 +66,7 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
     coloredlogs.install(level=level)
 
     with Manager() as manager:
-        state_dict = manager.dict()
+        state_dict = manager.dict()  # type: ignore
         XMState.init_state(state_dict)
         state = XMState(state_dict)
 
@@ -130,4 +130,4 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
 
 
 if __name__ == "__main__":
-    sys.exit(main())  # pragma: no cover
+    sys.exit(main())  # pragma: no cover, pylint: disable=E1120

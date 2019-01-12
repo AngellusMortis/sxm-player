@@ -7,7 +7,7 @@ __all__ = ['send_message']
 async def send_message(ctx, message: str = None,
                        embed: Embed = None, sep: str = ', '):
     if message is None and embed is None:
-        raise errors.CommandException('A message or a embed must be provided')
+        raise errors.CommandError('A message or a embed must be provided')
 
     if isinstance(ctx.message.channel, TextChannel):
         if message is not None:

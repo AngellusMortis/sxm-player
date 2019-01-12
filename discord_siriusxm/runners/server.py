@@ -12,16 +12,17 @@ __all__ = ['ServerRunner']
 class ServerRunner(BaseRunner):
     """ SiriusXMProxy Server for Discord bot to interface with """
 
-    _ip: str = None
-    _port: int = None
-    _request_log_level: int = logging.WARN
-    sxm: SiriusXMClient = None
+    _ip: str
+    _port: int
+    _request_log_level: int
+    sxm: SiriusXMClient
 
     def __init__(self, port: int, ip: str,
                  username: str, password: str,
                  region: str, request_log_level: int = logging.WARN,
                  *args, **kwargs):
-        super().__init__(name='server', *args, **kwargs)
+        kwargs['name'] = 'server'
+        super().__init__(*args, **kwargs)
 
         self._port = port
         self._ip = ip

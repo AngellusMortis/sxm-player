@@ -2,16 +2,15 @@ import datetime
 import logging
 import os
 import subprocess
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
+
 from sxm.models import XMMarker
 
 from .models import Episode, Song
-
-TRIM_VARIANCE = 0.05
 
 logger = logging.getLogger('discord_siriusxm.utils')
 
@@ -78,7 +77,7 @@ def get_files(folder: str) -> List[str]:
 
 
 def splice_file(input_file: str, output_file: str,
-                start_time: int, end_time: int) -> str:
+                start_time: int, end_time: int) -> Union[str, None]:
     """ Splices a chunk off of the input file and saves it """
 
     args = [

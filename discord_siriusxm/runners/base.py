@@ -7,11 +7,12 @@ from ..models import XMState
 
 @dataclass
 class BaseRunner:
+    state: XMState
+    _log: logging.Logger
+
     name: str = 'runner'
-    state: XMState = None
 
     _delay: int = 1
-    _log: logging.Logger = None
     _do_loop: bool = True
 
     def __init__(self, state_dict: dict, name: str = 'runner', delay: int = 1):

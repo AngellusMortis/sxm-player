@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import List, Union
 
 from discord.ext.commands import BadArgument, Converter
 
@@ -20,8 +20,10 @@ class XMChannelConverter(Converter):
 
 
 class XMChannelListConverter(XMChannelConverter):
-    async def convert(self, ctx, channel_ids: str) -> List[XMChannel]:
-        channel_ids = channel_ids.split(',')
+    async def convert(self, ctx,
+                      channel_ids: Union[str, List[str]]) -> List[XMChannel]:
+        if isinstance(channel_ids, str):
+            channel_ids = channel_ids.split(',')
         channels = []
 
         for channel_id in channel_ids:
@@ -44,7 +46,7 @@ class IntRangeConverter(Converter):
         return '`{name}` must be a number between {min} and {max}'.format(
             name=self.name, min=self.min, max=self.max)
 
-    async def convert(self, ctx, argument: str) -> int:
+    async def convert(self, ctx, argument: Union[str, int]) -> int:
         try:
             argument = int(argument)
         except ValueError:
@@ -57,16 +59,23 @@ class IntRangeConverter(Converter):
 
 
 @dataclass
+class CountConverter(IntRangeConverter):
+    name: str = 'count'
+
+
+@dataclass
 class VolumeConverter(IntRangeConverter):
     max: int = 100
     name: str = 'volume'
 
-    async def convert(self, ctx,
-                      argument: Optional[str]) -> Union[float, None]:
+    async def convert(self, ctx,  # type: ignore
+                      argument: Union[str, int, None]) -> Union[float, None]:
+        return_value: Union[float, None] = None
+
         if argument is not None:
-            if argument[-1] == '%':
+            if isinstance(argument, str) and argument[-1] == '%':
                 argument = argument[:-1]
             argument = await super().convert(ctx, argument)
-            argument = float(argument) / 100.0
+            return_value = float(argument) / 100.0
 
-        return argument
+        return return_value

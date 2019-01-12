@@ -7,17 +7,17 @@ from typing import Optional
 from discord import Embed, Message, TextChannel
 from discord.ext.commands import Bot, Command, Context, check, command, errors
 from humanize import naturaltime
+from sqlalchemy import or_
 from tabulate import tabulate
 
-from sqlalchemy import or_
 from sxm.models import XMImage, XMSong
 
 from ...models import Episode, Song
 from ...player import AudioPlayer
 from ..base import BaseRunner
 from .checks import is_playing, require_matching_voice, require_voice
-from .converters import (IntRangeConverter, VolumeConverter,
-                         XMChannelConverter, XMChannelListConverter)
+from .converters import (CountConverter, VolumeConverter, XMChannelConverter,
+                         XMChannelListConverter)
 from .utils import send_message
 
 __all__ = ['BotRunner']
@@ -32,14 +32,15 @@ class SXMCommand(Command):
 class BotRunner(BaseRunner):
     """ Discord Bot to play SiriusXM content """
 
+    bot: Bot
+    player: AudioPlayer
     prefix: str
     token: str
-    bot: Bot = None
-    player: AudioPlayer = None
 
     def __init__(self, prefix: str, description: str,
                  token: str, *args, **kwargs):
-        super().__init__(name='bot', *args, **kwargs)
+        kwargs['name'] = 'bot'
+        super().__init__(*args, **kwargs)
 
         self.prefix = prefix
         self.token = token
@@ -140,12 +141,13 @@ class BotRunner(BaseRunner):
             return
 
         db_item = None
-        if is_song:
-            db_item = self.state.db.query(Song)\
-                .filter_by(guid=guid).first()
-        else:
-            db_item = self.state.db.query(Episode)\
-                .filter_by(guid=guid).first()
+        if self.state.db is not None:
+            if is_song:
+                db_item = self.state.db.query(Song)\
+                    .filter_by(guid=guid).first()
+            else:
+                db_item = self.state.db.query(Episode)\
+                    .filter_by(guid=guid).first()
 
         if db_item is not None and not os.path.exists(db_item.file_path):
             self._log.warn(f'file does not exist: {db_item.file_path}')
@@ -186,17 +188,17 @@ class BotRunner(BaseRunner):
 
         items = None
         if is_song:
-            items = self.state.db.query(Song).filter(or_(
-                Song.guid.ilike(f'{search}%'),
-                Song.title.ilike(f'{search}%'),
-                Song.artist.ilike(f'{search}%'),
-            )).order_by(Song.air_time.desc())[:10]
+            items = self.state.db.query(Song).filter(or_(  # type: ignore
+                Song.guid.ilike(f'{search}%'),  # type: ignore
+                Song.title.ilike(f'{search}%'),  # type: ignore
+                Song.artist.ilike(f'{search}%'),  # type: ignore
+            )).order_by(Song.air_time.desc())[:10]  # type: ignore
         else:
-            items = self.state.db.query(Episode).filter(or_(
-                Episode.guid.ilike(f'{search}%'),
-                Episode.title.ilike(f'{search}%'),
-                Episode.show.ilike(f'{search}%')
-            )).order_by(Episode.air_time.desc())[:10]
+            items = self.state.db.query(Episode).filter(or_(  # type: ignore
+                Episode.guid.ilike(f'{search}%'),  # type: ignore
+                Episode.title.ilike(f'{search}%'),  # type: ignore
+                Episode.show.ilike(f'{search}%')  # type: ignore
+            )).order_by(Episode.air_time.desc())[:10]  # type: ignore
 
         if len(items) > 0:
             message = (
@@ -216,10 +218,15 @@ class BotRunner(BaseRunner):
 
         xm_channel = self.state.get_channel(
             self.state.active_channel_id)
-        cut = self.state.live.get_latest_cut(
-            now=self.state.radio_time)
-        episode = self.state.live.get_latest_episode(
-            now=self.state.radio_time)
+
+        if xm_channel is None or self.player.voice is None:
+            return
+
+        if self.state.live is not None:
+            cut = self.state.live.get_latest_cut(
+                now=self.state.radio_time)
+            episode = self.state.live.get_latest_episode(
+                now=self.state.radio_time)
 
         np_title = None
         np_author = None
@@ -284,6 +291,9 @@ class BotRunner(BaseRunner):
         xm_channel = self.state.get_channel(
             self.state.active_channel_id)
 
+        if self.state.live is None or xm_channel is None:
+            return
+
         song_cuts = []
         now = self.state.radio_time
         latest_cut = self.state.live.get_latest_cut(now)
@@ -294,10 +304,11 @@ class BotRunner(BaseRunner):
                 continue
 
             end = int(song_cut.time + song_cut.duration)
-            if song_cut.time < now and \
-                    (end > self.state.start_time or
-                        song_cut.time > self.state.start_time):
-                song_cuts.append(song_cut)
+            if self.state.start_time is not None:
+                if song_cut.time < now and \
+                        (end > self.state.start_time or
+                            song_cut.time > self.state.start_time):
+                    song_cuts.append(song_cut)
 
             if len(song_cuts) >= count:
                 break
@@ -415,11 +426,14 @@ class BotRunner(BaseRunner):
         for a SiriusXM channel. Can use comma seperated list of channel_ids
         to play from multiple channels (max 5 channels) """
 
+        if self.state.db is None:
+            return
+
         channel_ids = [x.id for x in xm_channels]
         unique_songs = self.state.db\
             .query(Song.title, Song.artist)\
-            .filter(Song.channel.in_(channel_ids))\
-            .distinct().all()
+            .filter(Song.channel.in_(channel_ids))  # type: ignore
+        unique_songs = unique_songs.distinct().all()
 
         if len(unique_songs) < threshold:
             await send_message(
@@ -458,8 +472,8 @@ class BotRunner(BaseRunner):
 
     @command(pass_context=True, cls=SXMCommand)
     @check(is_playing)
-    async def recent(self, ctx: Context,
-                     count: IntRangeConverter(name = 'count') = 3) -> None:
+    async def recent(self, ctx: Context,  # type: ignore
+                     count: CountConverter = 3) -> None:
         """Responds with the last 1-10 songs that been
         played on this channel"""
 
@@ -481,7 +495,8 @@ class BotRunner(BaseRunner):
     @command(pass_context=True, no_pm=True, cls=SXMCommand)
     @check(require_voice)
     async def reset(self, ctx: Context) -> None:
-        """Forces bot to join and then leave current voice channel to reset it"""
+        """Forces bot to join and then leave current voice channel
+        to reset it"""
 
         await ctx.invoke(self.summon)
         await self.player.stop()

@@ -47,6 +47,9 @@ async def require_matching_voice(ctx):
     if not await require_player_voice(ctx):
         return False
 
+    if ctx.message.author.voice is None or ctx.cog.player.voice is None:
+        return False
+
     author_channel = ctx.message.author.voice.channel
     player_channel = ctx.cog.player.voice.channel
 

@@ -1,25 +1,22 @@
 import asyncio
 import os
-import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Union
+from typing import List, Optional, Union
 
-from discord import AudioSource, Game
+from discord import AudioSource, FFmpegPCMAudio, Game
 from discord.ext.commands import CommandError
-
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.session import Session
-from sxm.models import XMChannel, XMImage, XMLiveChannel, XMSong
 
-from .forked import FFmpegPCMAudio
+from sxm.models import XMChannel, XMImage, XMLiveChannel, XMSong
 
 Base = declarative_base()
 
 
-class Song(Base):
+class Song(Base):  # type: ignore
     __tablename__ = 'songs'
 
     guid: str = Column(String, primary_key=True)
@@ -53,7 +50,7 @@ class Song(Base):
         return Song.get_pretty_name(self.title, self.artist, True)
 
 
-class Episode(Base):
+class Episode(Base):  # type: ignore
     __tablename__ = 'episodes'
 
     guid: str = Column(String, primary_key=True)
@@ -64,7 +61,7 @@ class Episode(Base):
     file_path: str = Column(String)
 
     @staticmethod
-    def get_pretty_name(title: str, show: str, air_time: str,
+    def get_pretty_name(title: str, show: str, air_time: datetime,
                         bold: bool = False) -> str:
         """ Returns a formatted name of show """
 
@@ -90,7 +87,7 @@ class Episode(Base):
 
 class DictState:
     """Class that uses a shared memory dictionary to populate attributes"""
-    _state_dict: dict = None
+    _state_dict: dict
 
     def __init__(self, state_dict: dict):
         self._state_dict = state_dict
@@ -109,7 +106,7 @@ class DictState:
 
 
 class SiriusXMActivity(Game):
-    def __init__(self, start: int, radio_time: int,
+    def __init__(self, start: Optional[int], radio_time: Optional[int],
                  channel: XMChannel, live_channel: XMLiveChannel, **kwargs):
 
         self.timestamps = {'start': start}
@@ -128,7 +125,8 @@ class SiriusXMActivity(Game):
         self.update_status(channel, live_channel, radio_time)
 
     def update_status(self, channel: XMChannel,
-                      live_channel: XMLiveChannel, radio_time: int) -> None:
+                      live_channel: XMLiveChannel,
+                      radio_time: Optional[int]) -> None:
         """ Updates activity object from current channel playing """
 
         self.state = "Playing music from SiriusXM"
@@ -158,12 +156,12 @@ class SiriusXMActivity(Game):
 
 class XMState(DictState):
     """Class to store state SiriusXM Radio player for Discord Bot"""
-    _channels: List[XMChannel] = None
-    _live_update_time: int = None
-    _live: XMLiveChannel = None
-    _archive_folder: str = None
-    _processed_folder: str = None
-    _stream_folder: str = None
+    _channels: Optional[List[XMChannel]] = None
+    _live_update_time: Optional[int] = None
+    _live: Optional[XMLiveChannel] = None
+    _archive_folder: Optional[str] = None
+    _processed_folder: Optional[str] = None
+    _stream_folder: Optional[str] = None
 
     _db: Session = None
     _db_reset: bool = False
@@ -216,16 +214,17 @@ class XMState(DictState):
                 self._live_update_time = last_update
                 self._live = XMLiveChannel(self._state_dict['live'])
 
-            if self._live.tune_time is not None:
-                self._state_dict['time_offset'] = now - self._live.tune_time
+                if self._live.tune_time is not None:
+                    self._state_dict['time_offset'] = \
+                        now - self._live.tune_time
+
+                if self._state_dict['start_time'] is None:
+                    if self._live.tune_time is None:
+                        self._state_dict['start_time'] = now
+                    else:
+                        self._state_dict['start_time'] = self._live.tune_time
             else:
                 self._state_dict['time_offset'] = 0
-
-        if self._state_dict['start_time'] is None:
-            if self._live.tune_time is None:
-                self._state_dict['start_time'] = now
-            else:
-                self._state_dict['start_time'] = self._live.tune_time
         return self._live
 
     @live.setter
@@ -275,7 +274,7 @@ class XMState(DictState):
     def reset_channel(self) -> None:
         """ Removes active SiriusXM channel """
 
-        self.active_channel_id = None
+        self.active_channel_id = None  # type: ignore
         self.live = None
 
     @property
@@ -307,7 +306,7 @@ class XMState(DictState):
 
     @property
     def db(self) -> Union[Session, None]:
-        if self._db is None and self.output is not None:
+        if self._db is None and self.processed_folder is not None:
             from .utils import init_db
 
             self._db = init_db(self.processed_folder, self._db_reset)
@@ -318,9 +317,6 @@ class XMState(DictState):
 class LiveStreamInfo:
     channel: XMChannel
     resetting: bool = False
-
-    process: subprocess.Popen = None
-    source: AudioSource = None
 
     _counter: int = 0
     _reset_counter: int = 0
@@ -338,7 +334,7 @@ class LiveStreamInfo:
         start = time.time()
         now = start
         can_start = False
-        while not can_start and now - start < 60:
+        while not can_start and now - start < 30:
             await asyncio.sleep(0.1)
             now = time.time()
             if state.stream_url is not None and (now - start) > 5:
@@ -350,7 +346,7 @@ class LiveStreamInfo:
         playback_source = FFmpegPCMAudio(
             state.stream_url,
             before_options='-f s16le -ar 48000 -ac 2',
-            log_level='fatal',
+            options='-loglevel fatal',
         )
 
         self.resetting = False
@@ -386,7 +382,7 @@ class LiveStreamInfo:
 
 @dataclass
 class QueuedItem:
-    audio_file: Union[Song, Episode] = None
-    live: LiveStreamInfo = None
+    audio_file: Union[Song, Episode, None] = None
+    live: Optional[LiveStreamInfo] = None
 
     source: AudioSource = None

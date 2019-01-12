@@ -2,12 +2,11 @@ import os
 import tempfile
 import time
 
-from discord import AudioSource
+from discord import AudioSource, FFmpegPCMAudio
 from discord.opus import Encoder as OpusEncoder
 
 from sxm.models import XMChannel
 
-from ..forked import FFmpegPCMAudio
 from .base import BaseRunner
 
 __all__ = ['HLSRunner']
@@ -19,35 +18,38 @@ DELAY = OpusEncoder.FRAME_LENGTH / 1000.0
 class HLSRunner(BaseRunner):
     channel: XMChannel
     source: AudioSource
-    stream_url: str = None
+    stream_url: str
 
     _loops: int = 0
-    _start: int = 0
+    _start: float = 0
 
     def __init__(self, base_url: str, *args, **kwargs):
-        super().__init__(name='hls', *args, **kwargs)
+        kwargs['name'] = 'hls'
+        super().__init__(*args, **kwargs)
 
         self.channel = self.state.get_channel(self.state.active_channel_id)
-        self.stream_url = f'{base_url}/{self.channel.id}.m3u8'
+        if self.channel is not None:
+            self.stream_url = f'{base_url}/{self.channel.id}.m3u8'
 
-        socket_file = os.path.join(tempfile.gettempdir(), f'{self.channel.id}.sock')
-        if os.path.exists(socket_file):
-            os.remove(socket_file)
+            socket_file = os.path.join(
+                tempfile.gettempdir(), f'{self.channel.id}.sock')
+            if os.path.exists(socket_file):
+                os.remove(socket_file)
 
-        options = f'unix:/{socket_file}'
-        self.state.stream_url = options
-        options = f'-af adelay=3000|3000 -listen 1 {options}'
+            options = f'unix:/{socket_file}'
+            self.state.stream_url = options
+            options = f'-af "adelay=3000|3000" -listen 1 {options}'
 
-        log_message = f'playing {self.stream_url}'
-        if self.state.stream_folder is not None:
-            stream_file = os.path.join(
-                self.state.stream_folder, f'{self.channel.id}.mp3')
+            log_message = f'playing {self.stream_url}'
+            if self.state.stream_folder is not None:
+                stream_file = os.path.join(
+                    self.state.stream_folder, f'{self.channel.id}.mp3')
 
-            if os.path.exists(stream_file):
-                os.remove(stream_file)
+                if os.path.exists(stream_file):
+                    os.remove(stream_file)
 
-            options = f'{options} file:/{stream_file}'
-            log_message += f' ({stream_file})'
+                options = f'{options} file:/{stream_file}'
+                log_message += f' ({stream_file})'
 
         options = f'{options} -f s16le -ar 48000 -ac 2'
         self._log.info(log_message)
