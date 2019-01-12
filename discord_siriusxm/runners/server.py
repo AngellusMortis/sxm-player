@@ -1,9 +1,8 @@
 import logging
+from http.server import HTTPServer
 from typing import Callable
 
-from aiohttp import web
-
-from sxm import SiriusXMClient, make_async_http_app
+from sxm import SiriusXMClient, make_sync_http_handler
 
 from .base import BaseRunner
 
@@ -44,28 +43,26 @@ class ServerRunner(BaseRunner):
 
         def update_handler(data: dict) -> None:
             self._log.debug(f'update data: {data}')
-            if self._state.active_channel_id == data['channelId']:
+            if self.state.active_channel_id == data['channelId']:
                 self._log.info(
-                    f'{self._state.active_channel_id}: updating channel data')
-                self._state.live = data
+                    f'{self.state.active_channel_id}: updating channel data')
+                self.state.live = data
         return update_handler
 
     def run(self) -> None:
         """ Runs SiriusXM proxy server """
 
-        app = make_async_http_app(self.sxm)
-
-        self._log.info(
-            f'server runner has start on http://{self._ip}:{self._port}'
-        )
-
         request_logger = logging.getLogger('discord_siriusxm.server.request')
         request_logger.setLevel(self._request_log_level)
 
-        web.run_app(
-            app,
-            access_log=request_logger,
-            print=None,
-            host=self._ip,
-            port=self._port
+        httpd = HTTPServer(
+            (self._ip, self._port),
+            make_sync_http_handler(self.sxm, request_logger),
         )
+        try:
+            self._log.info(
+                f'server runner has started on http://{self._ip}:{self._port}')
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        httpd.server_close()

@@ -12,7 +12,7 @@ import click
 import coloredlogs
 
 from .models import XMState
-from .runners import BotRunner, ServerRunner, run
+from .runners import BotRunner, HLSRunner, ServerRunner, run
 
 
 @click.command()
@@ -68,10 +68,11 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
     with Manager() as manager:
         state_dict = manager.dict()
         XMState.init_state(state_dict)
+        state = XMState(state_dict)
 
         process_count = 3
         if output_folder is not None:
-            state_dict['output'] = output_folder
+            state.output = output_folder
             process_count = 5
 
         def init_worker():
@@ -102,9 +103,17 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
             )
 
             try:
+                base_url = f'http://{host}:{port}'
                 while True:
-                    time.sleep(1)
+                    time.sleep(0.1)
 
+                    if state.active_channel_id is not None:
+                        pool.apply(
+                            func=run, args=(HLSRunner, state_dict),
+                            kwds={'base_url': base_url}
+                        )
+
+                # TODO:
                 # if output_folder is not None:
                 #     pool.apply_async(
                 #         func=run_archiver,
@@ -112,22 +121,9 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
                 #     pool.apply_async(
                 #         func=run_processor,
                 #         args=(state, reset_songs))
-
-                # pool.apply_async(
-                #     func=run_server,
-                #     args=(state, port, host,
-                #           username, password, region,
-                #           request_level,
-                #          )
-                # )
-                # pool.apply_async(
-                #     func=run_bot,
-                #     args=(prefix, description, state,
-                #           token, port)
-                # )
-                pool.close()
-                pool.join()
             except KeyboardInterrupt:
+                logger.warn('killing runners')
+                pool.close()
                 pool.terminate()
                 pool.join()
     return 0

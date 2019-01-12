@@ -12,6 +12,7 @@ class BaseRunner:
 
     _delay: int = 1
     _log: logging.Logger = None
+    _do_loop: bool = True
 
     def __init__(self, state_dict: dict, name: str = 'runner', delay: int = 1):
         self._delay = delay
@@ -25,6 +26,6 @@ class BaseRunner:
 
     def run(self):
         self._log.info(f'{self.name} runner has started')
-        while True:
-            time.sleep(self.delay)
+        while self._do_loop:
+            time.sleep(self._delay)
             self.loop()

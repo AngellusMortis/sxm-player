@@ -57,6 +57,11 @@ class AudioPlayer:
 
         return self._voice.is_playing()
 
+    @property
+    def voice(self) -> Union[VoiceClient, None]:
+        """ Gets the voice client for audio player """
+        return self._voice
+
     async def set_voice(self, channel: VoiceChannel) -> None:
         """ Sets voice channel for audio player """
 
@@ -111,36 +116,21 @@ class AudioPlayer:
         self.recent = []
         self.upcoming = []
 
-        if self._live is not None:
-            self._live.stop()
-
-        if reset_live:
-            self._xm_state.reset_channel()
+        if reset_live and self._live is not None:
+            self._live.stop(self._xm_state)
 
         if self._voice is not None:
             if self._voice.is_playing():
                 self._voice.stop()
             if disconnect:
-
-                if self._task is not None:
-                    self._task.cancel()
                 self._song_end()
                 self._live = None
                 self._log.debug('Voice disconnection stacktrace:')
                 self._log.debug('\n'.join(traceback.format_stack()))
                 await self._voice.disconnect()
                 self._voice = None
-
-    async def kick(self, channel: VoiceChannel) -> bool:
-        """ Kicks bot out of channel """
-
-        if self._voice is None:
-            return False
-
-        if self._voice.channel.id == channel.id:
-            await self.stop()
-            return True
-        return False
+                if self._task is not None:
+                    self._task.cancel()
 
     async def skip(self) -> bool:
         """ Skips current `QueueItem` """
@@ -186,7 +176,7 @@ class AudioPlayer:
                 Song.artist == song[1],
             )).first()
 
-        await self.add_file(song)
+        await self._add(file_info=song)
 
     async def _add(self, file_info: Union[Song, Episode, None] = None,
                    channel: Optional[XMChannel] = None) -> None:
@@ -205,7 +195,7 @@ class AudioPlayer:
 
         self._bot.loop.call_soon_threadsafe(self._event.set)
         if self._live is not None:
-            self._live.stop(self._bot)
+            self._live.stop(self._xm_state)
 
     async def _reset_live_stream(self, delay: int = 0) -> None:
         """ Stop and restart the existing HLS live stream """
@@ -289,14 +279,16 @@ class AudioPlayer:
                 log_item = self._current.live.channel.id
                 self._live = self._current.live
                 try:
-                    self._current.source = await self._live.play(
-                        self._read_livestream_out,
-                        self._read_livestream_error
-                    )
+                    self._current.source = \
+                        await self._live.play(self._xm_state)
                 except Exception:
                     self._log.error(
                         'Exception while trying to play HLS stream:')
                     self._log.error(traceback.format_exc())
+                    try:
+                        await self.stop()
+                    except Exception:
+                        self._log.error(traceback.format_exc())
                     continue
 
             self._current.source = PCMVolumeTransformer(
@@ -335,7 +327,6 @@ class AudioPlayer:
                             channel=xm_channel,
                             live_channel=self._xm_state.live,
                         )
-                    # channels updates every ~50 seconds
                     elif self._live.is_live_missing:
                         self._log.warn(
                             f'could not retrieve live stream data, resetting')

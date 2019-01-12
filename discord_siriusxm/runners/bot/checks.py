@@ -6,9 +6,7 @@ __all__ = ['no_pm', 'require_voice']
 
 
 async def no_pm(ctx):
-    print('test2')
     if not isinstance(ctx.message.channel, TextChannel):
-        print('test3')
         await send_message(
             ctx,
             (f'`{ctx.message.content}`: can only be used in a text chat room '
@@ -20,7 +18,6 @@ async def no_pm(ctx):
 
 async def require_voice(ctx):
     if not await no_pm(ctx):
-        print('test1')
         return False
 
     if ctx.message.author.voice is None:
@@ -29,5 +26,42 @@ async def require_voice(ctx):
             (f'`{ctx.message.content}`: can only be ran if you are in a voice '
              f'channel')
         )
+        return False
+    return True
+
+
+async def require_player_voice(ctx):
+    if ctx.cog.player.voice is None:
+        await send_message(
+            ctx,
+            f'`{ctx.message.content}`: I do not seem to be in a voice channel'
+        )
+        return False
+    return True
+
+
+async def require_matching_voice(ctx):
+    if not await require_voice(ctx):
+        return False
+
+    if not await require_player_voice(ctx):
+        return False
+
+    author_channel = ctx.message.author.voice.channel
+    player_channel = ctx.cog.player.voice.channel
+
+    if author_channel.id != player_channel.id:
+        await send_message(
+            ctx,
+            (f'`{ctx.message.content}`: I am not in the same voice channel '
+             f'as you')
+        )
+        return False
+    return True
+
+
+async def is_playing(ctx):
+    if not ctx.cog.player.is_playing:
+        await send_message(ctx, f'`{ctx.message.content}`: nothing is playing')
         return False
     return True

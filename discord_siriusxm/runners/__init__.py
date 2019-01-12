@@ -3,9 +3,10 @@ import traceback
 
 from .base import BaseRunner
 from .bot import BotRunner
+from .hls import HLSRunner
 from .server import ServerRunner
 
-__all__ = ['BotRunner', 'ServerRunner', 'run']
+__all__ = ['BotRunner', 'HLSRunner', 'ServerRunner', 'run']
 
 
 def run(cls: BaseRunner, state_dict: dict, *args, **kwargs) -> None:

@@ -1,15 +1,13 @@
 import asyncio
 import os
 import subprocess
-import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, List, Union
+from typing import List, Union
 
 from discord import AudioSource, Game
-from discord.ext.commands import Bot
-from discord.opus import Encoder as OpusEncoder
+from discord.ext.commands import CommandError
 
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
@@ -110,53 +108,6 @@ class DictState:
         super().__setattr__(attr, value)
 
 
-class FakePlayer(threading.Thread):
-    """ Striped down Discord Audio Player to play HLS """
-    DELAY = OpusEncoder.FRAME_LENGTH / 1000.0
-
-    def __init__(self, source):
-        threading.Thread.__init__(self)
-        self.daemon = True
-        self.source = source
-
-        self._end = threading.Event()
-
-    def _do_run(self):
-        self.loops = 0
-        self._start = time.time()
-
-        while not self._end.is_set():
-            self.loops += 1
-            data = self.source.read()
-
-            if not data:
-                self.stop()
-                break
-            next_time = self._start + self.DELAY * self.loops
-            delay = max(0, self.DELAY + (next_time - time.time()))
-            time.sleep(delay)
-
-    def run(self):
-        try:
-            self._do_run()
-        except Exception as exc:
-            self._current_error = exc
-            self.stop()
-        finally:
-            self.source.cleanup()
-
-    def stop(self):
-        self._end.set()
-
-
-@dataclass
-class QueuedItem:
-    audio_file: Union[Song, Episode] = None
-    channel: XMChannel = None
-
-    source: AudioSource = None
-
-
 class SiriusXMActivity(Game):
     def __init__(self, start: int, radio_time: int,
                  channel: XMChannel, live_channel: XMLiveChannel, **kwargs):
@@ -227,7 +178,7 @@ class XMState(DictState):
         for a `XMState` object """
 
         state_dict['active_channel_id'] = None
-        state_dict['stream_file'] = None
+        state_dict['stream_url'] = None
         state_dict['channels'] = []
         state_dict['start_time'] = None
         state_dict['live'] = None
@@ -362,6 +313,7 @@ class XMState(DictState):
             self._db = init_db(self.processed_folder, self._db_reset)
         return self._db
 
+
 @dataclass
 class LiveStreamInfo:
     channel: XMChannel
@@ -372,7 +324,6 @@ class LiveStreamInfo:
 
     _counter: int = 0
     _reset_counter: int = 0
-    _stream_player: FakePlayer = None
 
     def __init__(self, channel: XMChannel):
         self.channel = channel
@@ -382,94 +333,29 @@ class LiveStreamInfo:
 
         self.resetting = True
 
-        state.set_channel(self.channel)
+        state.set_channel(self.channel.id)
 
         start = time.time()
         now = start
         can_start = False
-        while not can_start and now - start < 30:
+        while not can_start and now - start < 60:
             await asyncio.sleep(0.1)
             now = time.time()
-            if os.path.exists(self.archive_file):
-                if os.path.getsize(self.archive_file) > 10000:
-                    can_start = True
+            if state.stream_url is not None and (now - start) > 5:
+                can_start = True
 
         if not can_start:
-            raise Exception('HLS archive file is not growing in size')
+            raise CommandError('HLS archive file is not growing in size')
 
         playback_source = FFmpegPCMAudio(
-            self.archive_file,
+            state.stream_url,
+            before_options='-f s16le -ar 48000 -ac 2',
             log_level='fatal',
         )
 
         self.resetting = False
 
         return playback_source
-
-    # async def play(self, stdout_callback: Callable,
-    #                stderr_callback: Callable) -> AudioSource:
-    #     """ Plays FFmpeg livestream """
-
-    #     self.stop()
-
-    #     self.resetting = True
-    #     if os.path.exists(self.archive_file):
-    #         os.remove(self.archive_file)
-
-    #     self.source = FFmpegPCMAudio(
-    #         self.stream_url,
-    #         before_options='-f hls',
-    #         after_options=self.archive_file,
-    #         stderr=subprocess.PIPE
-    #     )
-    #     self.process = self.source._process
-
-    #     loop = asyncio.get_event_loop()
-    #     loop.add_reader(self.process.stdout, stdout_callback)
-    #     loop.add_reader(self.process.stderr, stderr_callback)
-
-    #     start = time.time()
-    #     now = start
-    #     can_start = False
-    #     while not can_start and now - start < 30:
-    #         await asyncio.sleep(0.1)
-    #         now = time.time()
-    #         if os.path.exists(self.archive_file):
-    #             if os.path.getsize(self.archive_file) > 10000:
-    #                 can_start = True
-
-    #     if not can_start:
-    #         raise Exception('HLS archive file is not growing in size')
-
-    #     playback_source = FFmpegPCMAudio(
-    #         self.archive_file,
-    #         log_level='fatal',
-    #     )
-
-    #     self.resetting = False
-
-    #     return playback_source
-
-    # def stop(self, bot: Bot = None) -> None:
-    #     """ Stops FFmpeg livestream """
-
-    #     if self.source is not None:
-    #         try:
-    #             if bot is None:
-    #                 loop = asyncio.get_event_loop()
-    #             else:
-    #                 loop = bot.loop
-    #             loop.remove_reader(self.process.stdout)
-    #             loop.remove_reader(self.process.stderr)
-    #         except ValueError:
-    #             pass
-
-    #         try:
-    #             self.source.cleanup()
-    #         except OSError:
-    #             pass
-    #         self.source = None
-    #         self.process = None
 
     def stop(self, state: XMState) -> None:
         """ Stops FFmpeg livestream """
@@ -488,7 +374,7 @@ class LiveStreamInfo:
         if self.resetting:
             return False
 
-        if self._counter < 11:
+        if self._counter < 2:
             self._counter += 1
             return False
         return True
@@ -496,3 +382,11 @@ class LiveStreamInfo:
     def reset_counters(self):
         self._counter = 0
         self._reset_counter = 0
+
+
+@dataclass
+class QueuedItem:
+    audio_file: Union[Song, Episode] = None
+    live: LiveStreamInfo = None
+
+    source: AudioSource = None
