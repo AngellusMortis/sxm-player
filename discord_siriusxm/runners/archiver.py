@@ -46,7 +46,7 @@ class ArchiveRunner(BaseRunner):
                 deleted += removed
 
         self._log.info(
-            f'completed processing: deleted files: {deleted}, '
+            f'archived: deleted files: {deleted}, '
             f'archived file: {archived}'
         )
 
