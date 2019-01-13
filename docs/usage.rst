@@ -117,14 +117,14 @@ stopping the tunes.
 
     $ /sxm summon
 
-Change volume. 0.0 = 0%, 1.0 = 100%, bot always starts at 0.25. No argument
-retrieves volume level.
+Change volumes. Numbers range from 0% to 100%, bot always starts at 25%.
+No argument retrieves volume level.
 
 .. code-block:: console
 
     $ /sxm volume       # gets current volume level
-    $ /sxm volume 1.0   # sets volume to 100%
-    $ /sxm volume 0.25  $ sets volume to default of 25%
+    $ /sxm volume 100   # sets volume to 100%
+    $ /sxm volume 25  $ sets volume to default of 25%
 
 Stops all music playback and kicks bot of out voice channel.
 
@@ -132,11 +132,12 @@ Stops all music playback and kicks bot of out voice channel.
 
     $ /sxm stop
 
-Kicks bot out of voice channel. If playing music, also stops.
+Resets the bot if it gets stuck in a voice channel. If playing music,
+also stops.
 
 .. code-block:: console
 
-    $ /sxm kick
+    $ /sxm reset
 
 Retrieves what the bot is currently playing.
 
