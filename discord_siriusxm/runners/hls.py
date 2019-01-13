@@ -21,7 +21,7 @@ DELAY = OpusEncoder.FRAME_LENGTH / 1000.0
 class HLSRunner(BaseRunner):
     channel: XMChannel
     source: AudioSource
-    stderr_poll: select.poll
+    stderr_poll: select.poll  # pylint: disable=E1101
     stream_url: str
 
     _loops: int = 0
@@ -64,8 +64,8 @@ class HLSRunner(BaseRunner):
             stderr=subprocess.PIPE
         )
 
-        self.stderr_poll = select.poll()
-        self.stderr_poll.register(self.source._process.stderr, select.POLLIN)
+        self.stderr_poll = select.poll()  # pylint: disable=E1101
+        self.stderr_poll.register(self.source._process.stderr, select.POLLIN)  # pylint: disable=E1101 # noqa
 
     def __unload__(self):
         self.stop()
