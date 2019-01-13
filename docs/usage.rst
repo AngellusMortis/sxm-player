@@ -124,7 +124,7 @@ No argument retrieves volume level.
 
     $ /sxm volume       # gets current volume level
     $ /sxm volume 100   # sets volume to 100%
-    $ /sxm volume 25  $ sets volume to default of 25%
+    $ /sxm volume 25    # sets volume to default of 25%
 
 Stops all music playback and kicks bot of out voice channel.
 
