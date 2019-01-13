@@ -8,11 +8,10 @@ import time
 from multiprocessing import Manager, Pool
 
 import click
-
 import coloredlogs
 
 from .models import XMState
-from .runners import BotRunner, HLSRunner, ServerRunner, run
+from .runners import ArchiveRunner, BotRunner, HLSRunner, ServerRunner, run
 
 
 @click.command()
@@ -102,6 +101,16 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
                 }
             )
 
+            if output_folder is not None:
+                pool.apply_async(
+                    func=run, args=(ArchiveRunner, state_dict),
+                )
+
+            # TODO:
+            #     pool.apply_async(
+            #         func=run_processor,
+            #         args=(state, reset_songs))
+
             try:
                 base_url = f'http://{host}:{port}'
                 while True:
@@ -112,15 +121,6 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
                             func=run, args=(HLSRunner, state_dict),
                             kwds={'base_url': base_url}
                         )
-
-                # TODO:
-                # if output_folder is not None:
-                #     pool.apply_async(
-                #         func=run_archiver,
-                #         args=(state, ))
-                #     pool.apply_async(
-                #         func=run_processor,
-                #         args=(state, reset_songs))
             except KeyboardInterrupt:
                 logger.warn('killing runners')
                 pool.close()

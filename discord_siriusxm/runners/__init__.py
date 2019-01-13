@@ -2,12 +2,13 @@ import logging
 import traceback
 from typing import Type
 
+from .archiver import ArchiveRunner
 from .base import BaseRunner
 from .bot import BotRunner
 from .hls import HLSRunner
 from .server import ServerRunner
 
-__all__ = ['BotRunner', 'HLSRunner', 'ServerRunner', 'run']
+__all__ = ['ArchiveRunner', 'BotRunner', 'HLSRunner', 'ServerRunner', 'run']
 
 
 def run(cls: Type[BaseRunner], state_dict: dict, *args, **kwargs) -> None:

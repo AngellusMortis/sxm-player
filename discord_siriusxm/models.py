@@ -87,7 +87,7 @@ class Episode(Base):  # type: ignore
 
 class DictState:
     """Class that uses a shared memory dictionary to populate attributes"""
-    _state_dict: dict
+    _state_dict: dict = {}
 
     def __init__(self, state_dict: dict):
         self._state_dict = state_dict
