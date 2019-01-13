@@ -84,7 +84,7 @@ def splice_file(input_file: str, output_file: str,
         'ffmpeg', '-y',
         '-i', input_file, '-acodec', 'copy',
         '-ss', str(start_time), '-to', str(end_time),
-        '-loglevel', 'warning',
+        '-loglevel', 'fatal',
         output_file
     ]
 

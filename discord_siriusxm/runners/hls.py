@@ -1,6 +1,9 @@
 import os
+import select
+import subprocess
 import tempfile
 import time
+from typing import List
 
 from discord import AudioSource, FFmpegPCMAudio
 from discord.opus import Encoder as OpusEncoder
@@ -18,6 +21,7 @@ DELAY = OpusEncoder.FRAME_LENGTH / 1000.0
 class HLSRunner(BaseRunner):
     channel: XMChannel
     source: AudioSource
+    stderr_poll: select.poll
     stream_url: str
 
     _loops: int = 0
@@ -57,8 +61,11 @@ class HLSRunner(BaseRunner):
             self.stream_url,
             before_options='-loglevel fatal -f hls',
             options=options,
-            # stderr=subprocess.PIPE
+            stderr=subprocess.PIPE
         )
+
+        self.stderr_poll = select.poll()
+        self.stderr_poll.register(self.source._process.stderr, select.POLLIN)
 
     def __unload__(self):
         self.stop()
@@ -83,6 +90,17 @@ class HLSRunner(BaseRunner):
 
     def loop(self):
         self._loops += 1
+
+        lines: List[str] = []
+        while self.stderr_poll.poll(0.1):
+            lines.append(self.source._process.stderr.readline())
+
+        if len(lines) > 0:
+            with self.state.hls_error_lock:
+                if self.state.hls_errors is not None:
+                    lines = self.state.hls_errors.append(lines)
+                self.state.hls_errors = lines
+
         data = self.source.read()
 
         if not data or self.state.active_channel_id is None or \

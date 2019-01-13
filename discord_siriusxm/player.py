@@ -268,6 +268,22 @@ class AudioPlayer:
                 await self._add_random_playlist_song()
             self._current = None
 
+    async def _read_errors(self):
+        lines: Union[List[str], None] = None
+        with self._xm_state.hls_error_lock:
+            if self._xm_state.hls_errors is not None:
+                lines = self._xm_state.hls_errors
+                self._xm_state.hls_errors = None
+
+        if lines is not None:
+            for line in lines:
+                if '503' in line:
+                    self._log.warn(
+                        'Receiving 503 errors from SiriusXM, pausing stream')
+                    await self._reset_live_stream(10)
+                else:
+                    self._log.warn(line)
+
     async def _update(self) -> None:
         """ Bot task update the state of the audio player """
 
@@ -292,6 +308,8 @@ class AudioPlayer:
                             channel=xm_channel,
                             live_channel=self._xm_state.live,
                         )
+
+                        await self._read_errors()
                     elif self._live.is_live_missing:
                         self._log.warn(
                             f'could not retrieve live stream data, resetting')

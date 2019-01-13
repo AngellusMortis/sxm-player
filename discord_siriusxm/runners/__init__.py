@@ -6,9 +6,13 @@ from .archiver import ArchiveRunner
 from .base import BaseRunner
 from .bot import BotRunner
 from .hls import HLSRunner
+from .processor import ProcessorRunner
 from .server import ServerRunner
 
-__all__ = ['ArchiveRunner', 'BotRunner', 'HLSRunner', 'ServerRunner', 'run']
+__all__ = [
+    'ArchiveRunner', 'BotRunner', 'HLSRunner',
+    'ProcessorRunner', 'ServerRunner', 'run'
+]
 
 
 def run(cls: Type[BaseRunner], state_dict: dict, *args, **kwargs) -> None:

@@ -15,11 +15,12 @@ class BaseRunner:
     _delay: int = 1
     _do_loop: bool = True
 
-    def __init__(self, state_dict: dict, name: str = 'runner', delay: int = 1):
+    def __init__(self, state_dict: dict, name: str = 'runner',
+                 delay: int = 1, reset_songs: bool = False):
         self._delay = delay
         self.name = name
 
-        self.state = XMState(state_dict)
+        self.state = XMState(state_dict, db_reset=reset_songs)
         self._log = logging.getLogger(f'discord_siriusxm.{name}')
 
     def loop(self):

@@ -184,6 +184,8 @@ class XMState(DictState):
         state_dict['live_update_time'] = None
         state_dict['time_offset'] = None
         state_dict['output'] = None
+        state_dict['hls_error_lock'] = None
+        state_dict['hls_errors'] = None
 
     @property
     def channels(self) -> List[XMChannel]:
@@ -370,7 +372,8 @@ class LiveStreamInfo:
         if self.resetting:
             return False
 
-        if self._counter < 2:
+        # live channel is cached for ~50 seconds
+        if self._counter < 12:
             self._counter += 1
             return False
         return True

@@ -11,7 +11,8 @@ import click
 import coloredlogs
 
 from .models import XMState
-from .runners import ArchiveRunner, BotRunner, HLSRunner, ServerRunner, run
+from .runners import (ArchiveRunner, BotRunner, HLSRunner, ProcessorRunner,
+                      ServerRunner, run)
 
 
 @click.command()
@@ -67,6 +68,7 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
     with Manager() as manager:
         state_dict = manager.dict()  # type: ignore
         XMState.init_state(state_dict)
+        state_dict['hls_error_lock'] = manager.Lock()  # type: ignore # pylint: disable=E1101 # noqa
         state = XMState(state_dict)
 
         process_count = 3
@@ -104,6 +106,10 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
             if output_folder is not None:
                 pool.apply_async(
                     func=run, args=(ArchiveRunner, state_dict),
+                )
+                pool.apply_async(
+                    func=run, args=(ProcessorRunner, state_dict),
+                    kwds={'reset_songs': reset_songs}
                 )
 
             # TODO:

@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Union
+from typing import Union, Tuple
 
 from ..utils import get_files, splice_file
 from .base import BaseRunner
@@ -18,8 +18,37 @@ class ArchiveRunner(BaseRunner):
         super().__init__(*args, **kwargs)
 
         self._delay = ARCHIVE_CHUNK
-        os.makedirs(self.state.stream_folder, exist_ok=True)
-        os.makedirs(self.state.archive_folder, exist_ok=True)
+        if self.state.stream_folder is not None and \
+                self.state.archive_folder is not None:
+            os.makedirs(self.state.stream_folder, exist_ok=True)
+            os.makedirs(self.state.archive_folder, exist_ok=True)
+
+    def loop(self) -> None:
+        active_channel_id = self.state.active_channel_id
+        if active_channel_id is None or self.state.stream_folder is None:
+            return
+
+        deleted = 0
+        archived = None
+        stream_files = get_files(self.state.stream_folder)
+
+        for stream_file in stream_files:
+            abs_path = os.path.join(self.state.stream_folder, stream_file)
+            file_parts = stream_file.split('.')
+            if file_parts[-1] != 'mp3' or \
+                    file_parts[0] != active_channel_id:
+                os.remove(abs_path)
+                deleted += 1
+            else:
+                self.state.processing_file = True
+                archived, removed = self._process_stream_file(abs_path)
+                self.state.processing_file = False
+                deleted += removed
+
+        self._log.info(
+            f'completed processing: deleted files: {deleted}, '
+            f'archived file: {archived}'
+        )
 
     def _delete_old_archives(self, archive_folder: str, archive_base: str,
                              current_file: str) -> int:
@@ -40,13 +69,14 @@ class ArchiveRunner(BaseRunner):
                 removed += 1
         return removed
 
-    def _process_stream_file(self, abs_path: str) -> Union[str, None]:
+    def _process_stream_file(
+            self, abs_path: str) -> Tuple[Union[str, None], int]:
         """ Processes stream file by creating an archive from
         it if necessary """
 
         channel_id = self.state.active_channel_id
         if channel_id is None or self.state.archive_folder is None:
-            return None
+            return (None, 0)
         channel_archive = os.path.join(self.state.archive_folder, channel_id)
 
         max_archive_cutoff = int(time.time()) - ARCHIVE_BUFFER
@@ -69,38 +99,12 @@ class ArchiveRunner(BaseRunner):
             archive_output = os.path.join(
                 channel_archive, archive_filename)
             if os.path.exists(archive_output):
-                return None
+                return (None, 0)
 
-            self._delete_old_archives(
+            removed = self._delete_old_archives(
                 channel_archive, archive_base, archive_filename)
-            return splice_file(
+            return (splice_file(
                 abs_path, archive_output,
                 ARCHIVE_BUFFER, ARCHIVE_BUFFER + time_elapsed
-            )
-        return None
-
-    def loop(self):
-        active_channel_id = self.state.active_channel_id
-        if active_channel_id is None:
-            return
-
-        deleted = 0
-        archived = None
-        stream_files = get_files(self.state.stream_folder)
-
-        for stream_file in stream_files:
-            abs_path = os.path.join(self.state.stream_folder, stream_file)
-            file_parts = stream_file.split('.')
-            if file_parts[-1] != 'mp3' or \
-                    file_parts[0] != active_channel_id:
-                os.remove(abs_path)
-                deleted += 1
-            else:
-                self.state.processing_file = True
-                archived = self._process_stream_file(abs_path)
-                self.state.processing_file = False
-
-        self._log.info(
-            f'completed processing: deleted files: {deleted}, '
-            f'archived file: {archived}'
-        )
+            ), removed)
+        return (None, 0)
