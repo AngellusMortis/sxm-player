@@ -22,19 +22,17 @@ class AudioPlayer:
     upcoming: List[Union[Episode, Song]]
 
     _log: logging.Logger
-    _current: Optional[AudioSource] = None
-    _voice: Optional[VoiceClient] = None
-    _task: Optional[asyncio.Task] = None
-    _queue: asyncio.Queue = asyncio.Queue()
-    _event: asyncio.Event = asyncio.Event()
-    _bot: Bot = None
-    _xm_state: XMState
-    _volume: float = 0.25
-
-    _live: Optional[LiveStreamInfo]
-
-    _playlist_channels: Optional[List[XMChannel]] = None
     _random: SystemRandom
+    _xm_state: XMState
+    _bot: Bot = None
+    _current: Optional[AudioSource] = None
+    _event: asyncio.Event = asyncio.Event()
+    _live: Optional[LiveStreamInfo] = None
+    _playlist_channels: Optional[List[XMChannel]] = None
+    _queue: asyncio.Queue = asyncio.Queue()
+    _task: Optional[asyncio.Task] = None
+    _voice: Optional[VoiceClient] = None
+    _volume: float = 0.25
 
     def __init__(self, bot: Bot, xm_state: XMState):
         self._bot = bot
