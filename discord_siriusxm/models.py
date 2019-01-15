@@ -314,6 +314,10 @@ class XMState(DictState):
             self._db = init_db(self.processed_folder, self._db_reset)
         return self._db
 
+import logging
+import traceback
+log = logging.getLogger('test')
+
 
 @dataclass
 class LiveStreamInfo:
@@ -331,19 +335,20 @@ class LiveStreamInfo:
 
         self.resetting = True
 
-        state.set_channel(self.channel.id)
+        if state.active_channel_id is not self.channel.id:
+            state.set_channel(self.channel.id)
 
-        start = time.time()
-        now = start
-        can_start = False
-        while not can_start and now - start < 30:
-            await asyncio.sleep(0.1)
-            now = time.time()
-            if state.stream_url is not None and (now - start) > 5:
-                can_start = True
+            start = time.time()
+            now = start
+            can_start = False
+            while not can_start and now - start < 30:
+                await asyncio.sleep(0.1)
+                now = time.time()
+                if state.stream_url is not None and (now - start) > 5:
+                    can_start = True
 
-        if not can_start:
-            raise CommandError('HLS archive file is not growing in size')
+            if not can_start:
+                raise CommandError('HLS stream not found')
 
         playback_source = FFmpegPCMAudio(
             state.stream_url,
@@ -357,6 +362,9 @@ class LiveStreamInfo:
 
     def stop(self, state: XMState) -> None:
         """ Stops FFmpeg livestream """
+
+        log.error('HLS Live stopped disconnection stacktrace:')
+        log.error('\n'.join(traceback.format_stack()))
 
         state.reset_channel()
 

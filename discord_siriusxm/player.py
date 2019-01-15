@@ -194,8 +194,6 @@ class AudioPlayer:
         """ Callback for `discord.AudioPlayer`/`discord.VoiceClient` """
 
         self._bot.loop.call_soon_threadsafe(self._event.set)
-        if self._live is not None:
-            self._live.stop(self._xm_state)
 
     async def _reset_live_stream(self, delay: int = 0) -> None:
         """ Stop and restart the existing HLS live stream """
@@ -212,7 +210,7 @@ class AudioPlayer:
                 if delay > 0:
                     await asyncio.sleep(delay)
 
-                await self.add_live_stream(self._live)
+                await self.add_live_stream(self._live.channel)
                 self._live.resetting = False
         else:
             self._log.error(f'could not reset live stream')
@@ -237,9 +235,10 @@ class AudioPlayer:
                     self._current.audio_file.file_path,
                 )
             elif self._current.live is not None:
-                log_item = self._current.live.channel.id
-                self._live = self._current.live
                 try:
+                    log_item = self._current.live.channel.id
+                    self._live = self._current.live
+                    self._log.warn('playing live stream')
                     self._current.source = \
                         await self._live.play(self._xm_state)  # type: ignore
                 except Exception:

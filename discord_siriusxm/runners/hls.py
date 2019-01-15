@@ -27,7 +27,7 @@ class HLSRunner(BaseRunner):
     _loops: int = 0
     _start: float = 0
 
-    def __init__(self, base_url: str, *args, **kwargs):
+    def __init__(self, base_url: str, port: int, *args, **kwargs):
         kwargs['name'] = 'hls'
         super().__init__(*args, **kwargs)
 
@@ -35,12 +35,13 @@ class HLSRunner(BaseRunner):
         if self.channel is not None:
             self.stream_url = f'{base_url}/{self.channel.id}.m3u8'
 
-            socket_file = os.path.join(
-                tempfile.gettempdir(), f'{self.channel.id}.sock')
-            if os.path.exists(socket_file):
-                os.remove(socket_file)
+            # socket_file = os.path.join(
+            #     tempfile.gettempdir(), f'{self.channel.id}.sock')
+            # if os.path.exists(socket_file):
+            #     os.remove(socket_file)
 
-            options = f'unix:/{socket_file}'
+            # options = f'unix:/{socket_file}'
+            options = f'udp://127.0.0.1:{port}'
             self.state.stream_url = options
             options = f'-af "adelay=3000|3000" -listen 1 {options}'
 
@@ -93,7 +94,7 @@ class HLSRunner(BaseRunner):
 
         lines: List[str] = []
         while self.stderr_poll.poll(0.1):
-            lines.append(self.source._process.stderr.readline())
+            lines.append(self.source._process.stderr.readline().decode('utf8'))
 
         if len(lines) > 0:
             with self.state.hls_error_lock:
@@ -101,9 +102,9 @@ class HLSRunner(BaseRunner):
                     lines = self.state.hls_errors.append(lines)
                 self.state.hls_errors = lines
 
-        data = self.source.read()
+        self.source.read()
 
-        if not data or self.state.active_channel_id is None or \
+        if self.state.active_channel_id is None or \
                 self.state.active_channel_id != self.channel.id:
             self._do_loop = False
         next_time = self._start + DELAY * self._loops

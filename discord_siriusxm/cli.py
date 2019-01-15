@@ -125,7 +125,7 @@ def main(username: str, password: str, region: str, token: str, prefix: str,
                     if state.active_channel_id is not None:
                         pool.apply(
                             func=run, args=(HLSRunner, state_dict),
-                            kwds={'base_url': base_url}
+                            kwds={'base_url': base_url, 'port': port}
                         )
             except KeyboardInterrupt:
                 logger.warn('killing runners')
