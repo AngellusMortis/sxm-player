@@ -17,7 +17,7 @@ Base = declarative_base()
 
 
 class Song(Base):  # type: ignore
-    __tablename__ = 'songs'
+    __tablename__ = "songs"
 
     guid: str = Column(String, primary_key=True)
     title: str = Column(String, index=True)
@@ -31,9 +31,9 @@ class Song(Base):  # type: ignore
     def get_pretty_name(title: str, artist: str, bold: bool = False) -> str:
         """ Returns a formatted name of song """
 
-        mod = ''
+        mod = ""
         if bold:
-            mod = '**'
+            mod = "**"
 
         return f'{mod}"{title}"{mod} by {mod}{artist}{mod}'
 
@@ -51,7 +51,7 @@ class Song(Base):  # type: ignore
 
 
 class Episode(Base):  # type: ignore
-    __tablename__ = 'episodes'
+    __tablename__ = "episodes"
 
     guid: str = Column(String, primary_key=True)
     title: str = Column(String, index=True)
@@ -61,13 +61,14 @@ class Episode(Base):  # type: ignore
     file_path: str = Column(String)
 
     @staticmethod
-    def get_pretty_name(title: str, show: str, air_time: datetime,
-                        bold: bool = False) -> str:
+    def get_pretty_name(
+        title: str, show: str, air_time: datetime, bold: bool = False
+    ) -> str:
         """ Returns a formatted name of show """
 
-        mod = ''
+        mod = ""
         if bold:
-            mod = '**'
+            mod = "**"
 
         return f'{mod}"{title}"{mod} ({show}) from {air_time}'
 
@@ -82,11 +83,13 @@ class Episode(Base):  # type: ignore
         """ Returns a formatted name of show """
 
         return Episode.get_pretty_name(
-            self.title, self.show, self.air_time, True)
+            self.title, self.show, self.air_time, True
+        )
 
 
 class DictState:
     """Class that uses a shared memory dictionary to populate attributes"""
+
     _state_dict: dict = {}
 
     def __init__(self, state_dict: dict):
@@ -96,8 +99,9 @@ class DictState:
         if self._state_dict is not None and attr in self._state_dict:
             return self._state_dict[attr]
         else:
-            raise AttributeError("--%r object has no attribute %r" % (
-                type(self).__name__, attr))
+            raise AttributeError(
+                "--%r object has no attribute %r" % (type(self).__name__, attr)
+            )
 
     def __setattr__(self, attr: str, value) -> None:
         if self._state_dict is not None and attr in self._state_dict:
@@ -106,31 +110,40 @@ class DictState:
 
 
 class SiriusXMActivity(Game):
-    def __init__(self, start: Optional[int], radio_time: Optional[int],
-                 channel: XMChannel, live_channel: XMLiveChannel, **kwargs):
+    def __init__(
+        self,
+        start: Optional[int],
+        radio_time: Optional[int],
+        channel: XMChannel,
+        live_channel: XMLiveChannel,
+        **kwargs,
+    ):
 
-        self.timestamps = {'start': start}
+        self.timestamps = {"start": start}
         self._start = start
-        self.details = 'Test'
+        self.details = "Test"
 
-        self.assets = kwargs.pop('assets', {})
-        self.party = kwargs.pop('party', {})
-        self.application_id = kwargs.pop('application_id', None)
-        self.url = kwargs.pop('url', None)
-        self.flags = kwargs.pop('flags', 0)
-        self.sync_id = kwargs.pop('sync_id', None)
-        self.session_id = kwargs.pop('session_id', None)
+        self.assets = kwargs.pop("assets", {})
+        self.party = kwargs.pop("party", {})
+        self.application_id = kwargs.pop("application_id", None)
+        self.url = kwargs.pop("url", None)
+        self.flags = kwargs.pop("flags", 0)
+        self.sync_id = kwargs.pop("sync_id", None)
+        self.session_id = kwargs.pop("session_id", None)
         self._end = 0
 
         self.update_status(channel, live_channel, radio_time)
 
-    def update_status(self, channel: XMChannel,
-                      live_channel: XMLiveChannel,
-                      radio_time: Optional[int]) -> None:
+    def update_status(
+        self,
+        channel: XMChannel,
+        live_channel: XMLiveChannel,
+        radio_time: Optional[int],
+    ) -> None:
         """ Updates activity object from current channel playing """
 
         self.state = "Playing music from SiriusXM"
-        self.name = f'SiriusXM {channel.pretty_name}'
+        self.name = f"SiriusXM {channel.pretty_name}"
         self.large_image_url = None
         self.large_image_text = None
 
@@ -138,24 +151,26 @@ class SiriusXMActivity(Game):
         if latest_cut is not None and isinstance(latest_cut.cut, XMSong):
             song = latest_cut.cut
             pretty_name = Song.get_pretty_name(
-                song.title, song.artists[0].name)
-            self.name = (
-                f'{pretty_name} on {self.name}')
+                song.title, song.artists[0].name
+            )
+            self.name = f"{pretty_name} on {self.name}"
 
             if song.album is not None:
                 album = song.album
                 if album.title is not None:
                     self.large_image_text = (
-                        f'{album.title} by {song.artists[0].name}')
+                        f"{album.title} by {song.artists[0].name}"
+                    )
 
                 for art in album.arts:
                     if isinstance(art, XMImage):
-                        if art.size is not None and art.size == 'MEDIUM':
+                        if art.size is not None and art.size == "MEDIUM":
                             self.large_image_url = art.url
 
 
 class XMState(DictState):
     """Class to store state SiriusXM Radio player for Discord Bot"""
+
     _channels: Optional[List[XMChannel]] = None
     _live_update_time: Optional[int] = None
     _live: Optional[XMLiveChannel] = None
@@ -175,17 +190,17 @@ class XMState(DictState):
         """ Initializes a dictionary that will be used
         for a `XMState` object """
 
-        state_dict['active_channel_id'] = None
-        state_dict['stream_url'] = None
-        state_dict['channels'] = []
-        state_dict['start_time'] = None
-        state_dict['live'] = None
-        state_dict['processing_file'] = False
-        state_dict['live_update_time'] = None
-        state_dict['time_offset'] = None
-        state_dict['output'] = None
-        state_dict['hls_error_lock'] = None
-        state_dict['hls_errors'] = None
+        state_dict["active_channel_id"] = None
+        state_dict["stream_url"] = None
+        state_dict["channels"] = []
+        state_dict["start_time"] = None
+        state_dict["live"] = None
+        state_dict["processing_file"] = False
+        state_dict["live_update_time"] = None
+        state_dict["time_offset"] = None
+        state_dict["output"] = None
+        state_dict["hls_error_lock"] = None
+        state_dict["hls_errors"] = None
 
     @property
     def channels(self) -> List[XMChannel]:
@@ -193,7 +208,7 @@ class XMState(DictState):
 
         if self._channels is None:
             self._channels = []
-            for channel in self._state_dict['channels']:
+            for channel in self._state_dict["channels"]:
                 self._channels.append(XMChannel(channel))
         return self._channels
 
@@ -202,31 +217,31 @@ class XMState(DictState):
         """ Sets channel key in internal `state_dict`. """
 
         self._channels = None
-        self._state_dict['channels'] = value
+        self._state_dict["channels"] = value
 
     @property
     def live(self) -> Union[XMLiveChannel, None]:
         """ Returns current `XMLiveChannel` """
 
-        last_update = self._state_dict['live_update_time']
+        last_update = self._state_dict["live_update_time"]
         now = int(time.time() * 1000)
-        if self._live is None or \
-                self._live_update_time != last_update:
-            if self._state_dict['live'] is not None:
+        if self._live is None or self._live_update_time != last_update:
+            if self._state_dict["live"] is not None:
                 self._live_update_time = last_update
-                self._live = XMLiveChannel(self._state_dict['live'])
+                self._live = XMLiveChannel(self._state_dict["live"])
 
                 if self._live.tune_time is not None:
-                    self._state_dict['time_offset'] = \
+                    self._state_dict["time_offset"] = (
                         now - self._live.tune_time
+                    )
 
-                if self._state_dict['start_time'] is None:
+                if self._state_dict["start_time"] is None:
                     if self._live.tune_time is None:
-                        self._state_dict['start_time'] = now
+                        self._state_dict["start_time"] = now
                     else:
-                        self._state_dict['start_time'] = self._live.tune_time
+                        self._state_dict["start_time"] = self._live.tune_time
             else:
-                self._state_dict['time_offset'] = 0
+                self._state_dict["time_offset"] = 0
         return self._live
 
     @live.setter
@@ -234,10 +249,10 @@ class XMState(DictState):
         """ Sets live key in internal `state_dict`. """
 
         self._live = None
-        self._state_dict['start_time'] = None
-        self._state_dict['live'] = value
+        self._state_dict["start_time"] = None
+        self._state_dict["live"] = value
         if value is not None:
-            self._state_dict['live_update_time'] = time.time()
+            self._state_dict["live_update_time"] = time.time()
 
     @property
     def radio_time(self) -> Union[int, None]:
@@ -254,16 +269,18 @@ class XMState(DictState):
 
         if self.live is None:
             return None
-        return self._state_dict['start_time']
+        return self._state_dict["start_time"]
 
     def get_channel(self, name: str) -> Union[XMChannel, None]:
         """ Returns channel from list of `channels` with given name """
 
         name = name.lower()
         for channel in self.channels:
-            if channel.name.lower() == name or \
-                    channel.id.lower() == name or \
-                    channel.channel_number == name:
+            if (
+                channel.name.lower() == name
+                or channel.id.lower() == name
+                or channel.channel_number == name
+            ):
                 return channel
         return None
 
@@ -285,7 +302,7 @@ class XMState(DictState):
 
         if self._archive_folder is None:
             if self.output is not None:
-                self._archive_folder = os.path.join(self.output, 'archive')
+                self._archive_folder = os.path.join(self.output, "archive")
         return self._archive_folder
 
     @property
@@ -294,7 +311,7 @@ class XMState(DictState):
 
         if self._processed_folder is None:
             if self.output is not None:
-                self._processed_folder = os.path.join(self.output, 'processed')
+                self._processed_folder = os.path.join(self.output, "processed")
         return self._processed_folder
 
     @property
@@ -303,7 +320,7 @@ class XMState(DictState):
 
         if self._stream_folder is None:
             if self.output is not None:
-                self._stream_folder = os.path.join(self.output, 'streams')
+                self._stream_folder = os.path.join(self.output, "streams")
         return self._stream_folder
 
     @property
@@ -313,10 +330,6 @@ class XMState(DictState):
 
             self._db = init_db(self.processed_folder, self._db_reset)
         return self._db
-
-import logging
-import traceback
-log = logging.getLogger('test')
 
 
 @dataclass
@@ -348,12 +361,12 @@ class LiveStreamInfo:
                     can_start = True
 
             if not can_start:
-                raise CommandError('HLS stream not found')
+                raise CommandError("HLS stream not found")
 
         playback_source = FFmpegPCMAudio(
             state.stream_url,
-            before_options='-f s16le -ar 48000 -ac 2',
-            options='-loglevel fatal',
+            before_options="-f s16le -ar 48000 -ac 2",
+            options="-loglevel fatal",
         )
 
         self.resetting = False
@@ -362,10 +375,6 @@ class LiveStreamInfo:
 
     def stop(self, state: XMState) -> None:
         """ Stops FFmpeg livestream """
-
-        log.error('HLS Live stopped disconnection stacktrace:')
-        log.error('\n'.join(traceback.format_stack()))
-
         state.reset_channel()
 
     @property

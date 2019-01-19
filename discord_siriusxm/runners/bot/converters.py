@@ -12,25 +12,26 @@ class XMChannelConverter(Converter):
 
         if channel is None:
             raise BadArgument(
-                f'`channel_id` is invalid. Use `{ctx.prefix}channels` for '
-                f'a list of valid channels'
+                f"`channel_id` is invalid. Use `{ctx.prefix}channels` for "
+                f"a list of valid channels"
             )
 
         return channel
 
 
 class XMChannelListConverter(XMChannelConverter):
-    async def convert(self, ctx,
-                      channel_ids: Union[str, List[str]]) -> List[XMChannel]:
+    async def convert(
+        self, ctx, channel_ids: Union[str, List[str]]
+    ) -> List[XMChannel]:
         if isinstance(channel_ids, str):
-            channel_ids = channel_ids.split(',')
+            channel_ids = channel_ids.split(",")
         channels = []
 
         for channel_id in channel_ids:
             channels.append(await super().convert(ctx, channel_id))
 
         if len(channels) > 5:
-            raise BadArgument('too many `channel_ids`. Cannot be more than 5')
+            raise BadArgument("too many `channel_ids`. Cannot be more than 5")
 
         return channels
 
@@ -39,12 +40,13 @@ class XMChannelListConverter(XMChannelConverter):
 class IntRangeConverter(Converter):
     min: int = 1
     max: int = 10
-    name: str = 'argument'
+    name: str = "argument"
 
     @property
     def message(self):
-        return '`{name}` must be a number between {min} and {max}'.format(
-            name=self.name, min=self.min, max=self.max)
+        return "`{name}` must be a number between {min} and {max}".format(
+            name=self.name, min=self.min, max=self.max
+        )
 
     async def convert(self, ctx, argument: Union[str, int]) -> int:
         try:
@@ -60,20 +62,21 @@ class IntRangeConverter(Converter):
 
 @dataclass
 class CountConverter(IntRangeConverter):
-    name: str = 'count'
+    name: str = "count"
 
 
 @dataclass
 class VolumeConverter(IntRangeConverter):
     max: int = 100
-    name: str = 'volume'
+    name: str = "volume"
 
-    async def convert(self, ctx,  # type: ignore
-                      argument: Union[str, int, None]) -> Union[float, None]:
+    async def convert(  # type: ignore
+        self, ctx, argument: Union[str, int, None]
+    ) -> Union[float, None]:
         return_value: Union[float, None] = None
 
         if argument is not None:
-            if isinstance(argument, str) and argument[-1] == '%':
+            if isinstance(argument, str) and argument[-1] == "%":
                 argument = argument[:-1]
             argument = await super().convert(ctx, argument)
             return_value = float(argument) / 100.0
