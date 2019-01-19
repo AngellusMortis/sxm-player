@@ -100,10 +100,7 @@ class HLSRunner(BaseRunner):
             lines.append(self.source._process.stderr.readline().decode("utf8"))
 
         if len(lines) > 0:
-            with self.state.hls_error_lock:
-                if self.state.hls_errors is not None:
-                    lines = self.state.hls_errors.append(lines)
-                self.state.hls_errors = lines
+            self.state.push_hls_errors(lines)
 
         self.source.read()
 

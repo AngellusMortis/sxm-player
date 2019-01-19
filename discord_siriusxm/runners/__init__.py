@@ -1,6 +1,7 @@
 import logging
 import traceback
 from typing import Type
+from multiprocessing import Lock
 
 from .archiver import ArchiveRunner
 from .base import BaseRunner
@@ -10,24 +11,37 @@ from .processor import ProcessorRunner
 from .server import ServerRunner
 
 __all__ = [
-    'ArchiveRunner', 'BotRunner', 'HLSRunner',
-    'ProcessorRunner', 'ServerRunner', 'run'
+    "ArchiveRunner",
+    "BotRunner",
+    "HLSRunner",
+    "ProcessorRunner",
+    "ServerRunner",
+    "run",
 ]
 
 
-def run(cls: Type[BaseRunner], state_dict: dict, *args, **kwargs) -> None:
-    logger = logging.getLogger('discord_siriusxm.runner')
+def run(
+    cls: Type[BaseRunner],
+    state_dict: dict,
+    lock: Lock,  # type: ignore
+    *args,
+    **kwargs
+) -> None:
+    logger = logging.getLogger("discord_siriusxm.runner")
+
+    kwargs["state_dict"] = state_dict
+    kwargs["lock"] = lock
 
     try:
-        runner = cls(state_dict=state_dict, *args, **kwargs)  # type: ignore
+        runner = cls(*args, **kwargs)  # type: ignore
     except Exception as e:
-        logger.error('error while initializing runner:')
+        logger.error("error while initializing runner:")
         logger.error(traceback.format_exc())
-        raise(e)
+        raise (e)
 
     try:
         runner.run()
     except Exception as e:
-        logger.error('error while running runner:')
+        logger.error("error while running runner:")
         logger.error(traceback.format_exc())
-        raise(e)
+        raise (e)

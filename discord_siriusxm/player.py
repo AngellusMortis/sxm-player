@@ -4,17 +4,30 @@ import traceback
 from random import SystemRandom
 from typing import List, Optional, Union
 
-from discord import (AudioSource, ClientException, FFmpegPCMAudio, Game,
-                     PCMVolumeTransformer, VoiceChannel, VoiceClient)
+from discord import (
+    AudioSource,
+    ClientException,
+    FFmpegPCMAudio,
+    Game,
+    PCMVolumeTransformer,
+    VoiceChannel,
+    VoiceClient,
+)
 from discord.ext.commands import Bot
 from sqlalchemy import and_
 
 from sxm.models import XMChannel
 
-from .models import (Episode, LiveStreamInfo, QueuedItem, SiriusXMActivity,
-                     Song, XMState)
+from .models import (
+    Episode,
+    LiveStreamInfo,
+    QueuedItem,
+    SiriusXMActivity,
+    Song,
+    XMState,
+)
 
-__all__ = ['AudioPlayer']
+__all__ = ["AudioPlayer"]
 
 
 class AudioPlayer:
@@ -37,7 +50,7 @@ class AudioPlayer:
     def __init__(self, bot: Bot, xm_state: XMState):
         self._bot = bot
         self._xm_state = xm_state
-        self._log = logging.getLogger('discord_siriusxm.player')
+        self._log = logging.getLogger("discord_siriusxm.player")
         self._random = SystemRandom()
 
         self.recent = []
@@ -95,8 +108,9 @@ class AudioPlayer:
         if self._current is not None:
             self._current.source.volume = self._volume
 
-    async def stop(self, disconnect: bool = True,
-                   reset_live: bool = True) -> None:
+    async def stop(
+        self, disconnect: bool = True, reset_live: bool = True
+    ) -> None:
         """ Stops the `AudioPlayer` """
 
         while not self._queue.empty():
@@ -122,8 +136,8 @@ class AudioPlayer:
             if disconnect:
                 self._song_end()
                 self._live = None
-                self._log.debug('Voice disconnection stacktrace:')
-                self._log.debug('\n'.join(traceback.format_stack()))
+                self._log.debug("Voice disconnection stacktrace:")
+                self._log.debug("\n".join(traceback.format_stack()))
                 await self._voice.disconnect()
                 self._voice = None
                 if self._task is not None:
@@ -164,26 +178,35 @@ class AudioPlayer:
 
         channel_ids = [x.id for x in self._playlist_channels]
 
-        songs = self._xm_state.db.query(Song.title, Song.artist)\
-            .filter(Song.channel.in_(channel_ids))  # type: ignore
+        songs = self._xm_state.db.query(Song.title, Song.artist).filter(
+            Song.channel.in_(channel_ids)  # type: ignore
+        )
         songs = songs.distinct().all()
 
         song = self._random.choice(songs)
-        song = self._xm_state.db.query(Song)\
-            .filter(and_(
-                Song.channel.in_(channel_ids),  # type: ignore
-                Song.title == song[0],
-                Song.artist == song[1],
-            )).first()
+        song = (
+            self._xm_state.db.query(Song)
+            .filter(
+                and_(
+                    Song.channel.in_(channel_ids),  # type: ignore
+                    Song.title == song[0],
+                    Song.artist == song[1],
+                )
+            )
+            .first()
+        )
 
         await self._add(file_info=song)
 
-    async def _add(self, file_info: Union[Song, Episode, None] = None,
-                   channel: Optional[XMChannel] = None) -> None:
+    async def _add(
+        self,
+        file_info: Union[Song, Episode, None] = None,
+        channel: Optional[XMChannel] = None,
+    ) -> None:
         """ Adds item to playing queue """
 
         if self._voice is None:
-            raise ClientException('Voice client is not set')
+            raise ClientException("Voice client is not set")
 
         live_stream = LiveStreamInfo(channel)
         item = QueuedItem(audio_file=file_info, live=live_stream)
@@ -199,7 +222,7 @@ class AudioPlayer:
         """ Stop and restart the existing HLS live stream """
 
         if self._live is None:
-            self._log.warn('No live stream to reset')
+            self._log.warn("No live stream to reset")
             return
 
         if self._live.is_reset_allowed:
@@ -213,7 +236,7 @@ class AudioPlayer:
                 await self.add_live_stream(self._live.channel)
                 self._live.resetting = False
         else:
-            self._log.error(f'could not reset live stream')
+            self._log.error(f"could not reset live stream")
             await self.stop()
 
     async def _audio_player(self) -> None:
@@ -232,18 +255,20 @@ class AudioPlayer:
 
                 log_item = self._current.audio_file.file_path
                 self._current.source = FFmpegPCMAudio(
-                    self._current.audio_file.file_path,
+                    self._current.audio_file.file_path
                 )
             elif self._current.live is not None:
                 try:
                     log_item = self._current.live.channel.id
                     self._live = self._current.live
-                    self._log.warn('playing live stream')
-                    self._current.source = \
-                        await self._live.play(self._xm_state)  # type: ignore
+                    self._log.warn("playing live stream")
+                    self._current.source = await self._live.play(  # type: ignore  # noqa
+                        self._xm_state
+                    )
                 except Exception:
                     self._log.error(
-                        'Exception while trying to play HLS stream:')
+                        "Exception while trying to play HLS stream:"
+                    )
                     self._log.error(traceback.format_exc())
                     try:
                         await self.stop()
@@ -252,31 +277,28 @@ class AudioPlayer:
                     continue
 
             self._current.source = PCMVolumeTransformer(
-                self._current.source, volume=self._volume)
-            self._log.info(f'playing {log_item}')
+                self._current.source, volume=self._volume
+            )
+            self._log.info(f"playing {log_item}")
 
             if self._voice is not None:
                 self._voice.play(self._current.source, after=self._song_end)
 
             await self._event.wait()
 
-            if self._playlist_channels is not None and \
-                    self._queue.qsize() < 5:
+            if self._playlist_channels is not None and self._queue.qsize() < 5:
                 await self._add_random_playlist_song()
             self._current = None
 
     async def _read_errors(self):
-        lines: Union[List[str], None] = None
-        with self._xm_state.hls_error_lock:
-            if self._xm_state.hls_errors is not None:
-                lines = self._xm_state.hls_errors
-                self._xm_state.hls_errors = None
+        lines = self._xm_state.pop_hls_errors()
 
         if lines is not None:
             for line in lines:
-                if '503' in line:
+                if "503" in line:
                     self._log.warn(
-                        'Receiving 503 errors from SiriusXM, pausing stream')
+                        "Receiving 503 errors from SiriusXM, pausing stream"
+                    )
                     await self._reset_live_stream(10)
                 else:
                     self._log.warn(line)
@@ -294,7 +316,8 @@ class AudioPlayer:
             activity = None
             if self._xm_state.active_channel_id is not None:
                 xm_channel = self._xm_state.get_channel(
-                    self._xm_state.active_channel_id)
+                    self._xm_state.active_channel_id
+                )
 
                 if self.is_playing and self._live is not None:
                     if self._xm_state.live is not None:
@@ -309,16 +332,16 @@ class AudioPlayer:
                         await self._read_errors()
                     elif self._live.is_live_missing:
                         self._log.warn(
-                            f'could not retrieve live stream data, resetting')
+                            f"could not retrieve live stream data, resetting"
+                        )
                         await self._reset_live_stream()
                 elif self._live is not None and not self._live.resetting:
-                    self._log.warn(f'live stream lost, resetting')
+                    self._log.warn(f"live stream lost, resetting")
                     await self._reset_live_stream()
             elif self.is_playing:
                 if self.current is None:
                     await self.stop()
                 else:
-                    activity = Game(
-                        name=self._current.audio_file.pretty_name)
+                    activity = Game(name=self._current.audio_file.pretty_name)
 
             await self._bot.change_presence(activity=activity)
