@@ -149,7 +149,7 @@ def main(
             try:
                 os.kill(state.runners[name], 0)
                 return True
-            except (KeyError, TypeError, ProcessLookupError) as e:
+            except (KeyError, TypeError, ProcessLookupError):
                 state.set_runner(name, None)
                 return False
 

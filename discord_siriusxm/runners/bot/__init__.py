@@ -119,6 +119,10 @@ class BotRunner(BaseRunner):
         if ctx.valid:
             self._log.info(f"{author}: {message.content}")
 
+    async def __before_invoke(self, ctx: Context) -> None:
+        if self.state.runners.get("server") is None:
+            raise errors.CommandError("SiriusXM server is not running yet")
+
     async def _play_file(
         self, ctx: Context, guid: str = None, is_song: bool = False
     ) -> None:

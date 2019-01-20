@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Union, Tuple
+from typing import Union, Tuple, Dict
 
 from ..utils import get_files, splice_file
 from .base import BaseRunner
@@ -13,6 +13,8 @@ ARCHIVE_BUFFER = 5
 
 
 class ArchiveRunner(BaseRunner):
+    last_size: Dict[str, int] = {}
+
     def __init__(self, *args, **kwargs):
         kwargs["name"] = "archiver"
         super().__init__(*args, **kwargs)
@@ -41,6 +43,13 @@ class ArchiveRunner(BaseRunner):
                 os.remove(abs_path)
                 deleted += 1
             else:
+                if not self._check_size(abs_path):
+                    self._log.error(
+                        "archive not increasing, resetting channel"
+                    )
+                    self.state.reset_channel()
+                    return
+
                 self.state.processing_file = True
                 archived, removed = self._process_stream_file(abs_path)
                 self.state.processing_file = False
@@ -50,6 +59,17 @@ class ArchiveRunner(BaseRunner):
             f"archived: deleted files: {deleted}, "
             f"archived file: {archived}"
         )
+
+    def _check_size(self, abs_path: str) -> bool:
+        current = os.path.getsize(abs_path)
+        if (
+            self.last_size.get(abs_path) is not None
+            and self.last_size[abs_path] == current
+        ):
+            return False
+
+        self.last_size[abs_path] = current
+        return True
 
     def _delete_old_archives(
         self, archive_folder: str, archive_base: str, current_file: str
