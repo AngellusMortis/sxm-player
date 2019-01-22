@@ -12,7 +12,7 @@ A Discord bot that will play SiriusXM radio stations.
 
 
 * Free software: MIT license
-* Documentation: https://siriusxm-discord-bot.readthedocs.io.
+* Documentation: https://mortis-music-discord-bot.readthedocs.io.
 
 
 Features
