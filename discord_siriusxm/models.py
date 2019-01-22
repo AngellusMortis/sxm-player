@@ -132,8 +132,8 @@ class XMState(DictState):
     def __init__(
         self,
         state_dict: dict,
-        lock: Lock,  # type: ignore
-        db_reset: bool = False,
+        lock: Lock,
+        db_reset: bool = False,  # type: ignore
     ):
         super().__init__(state_dict, lock)
 
@@ -411,10 +411,6 @@ class LiveStreamInfo:
         self.resetting = False
 
         return playback_source
-
-    def stop(self, state: XMState) -> None:
-        """ Stops FFmpeg livestream """
-        state.reset_channel()
 
     @property
     def is_reset_allowed(self):

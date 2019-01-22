@@ -53,7 +53,7 @@ from .runners import (
     help="Discord bot token",
 )
 @click.option(
-    "--prefix", type=str, default="/sxm ", help="Discord bot command prefix"
+    "--prefix", type=str, default="/music ", help="Discord bot command prefix"
 )
 @click.option(
     "--description",
@@ -87,6 +87,34 @@ from .runners import (
     "-r", "--reset-songs", is_flag=True, help="reset processed song database"
 )
 @click.option(
+    "--plex-username",
+    type=str,
+    default=None,
+    envvar="PLEX_USERNAME",
+    help="Plex username for local server",
+)
+@click.option(
+    "--plex-password",
+    type=str,
+    default=None,
+    envvar="PLEX_PASSWORD",
+    help="Plex password for local server",
+)
+@click.option(
+    "--plex-server-name",
+    type=str,
+    default=None,
+    envvar="PLEX_SERVER",
+    help="Plex server name for local server",
+)
+@click.option(
+    "--plex-library-name",
+    type=str,
+    default=None,
+    envvar="PLEX_LIBRARY",
+    help="Plex library name for local server",
+)
+@click.option(
     "-l",
     "--log-file",
     type=click.Path(),
@@ -114,6 +142,10 @@ def main(
     verbose: bool,
     debug: bool,
     log_file: str,
+    plex_username: str,
+    plex_password: str,
+    plex_server_name: str,
+    plex_library_name: str,
 ):
     """Command line interface for SiriusXM radio bot for Discord"""
 
@@ -182,6 +214,10 @@ def main(
                                 "prefix": prefix,
                                 "description": description,
                                 "token": token,
+                                "plex_username": plex_username,
+                                "plex_password": plex_password,
+                                "plex_server_name": plex_server_name,
+                                "plex_library_name": plex_library_name,
                             },
                         )
                         delay = 5

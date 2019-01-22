@@ -17,6 +17,8 @@ requirements = [
     "coloredlogs",
     "discord.py[voice]",
     "humanize",
+    "plexapi",
+    "psutil",
     "sqlalchemy",
     "sxm==0.1.0",
     "tabulate",

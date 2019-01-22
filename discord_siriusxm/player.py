@@ -30,6 +30,10 @@ from .models import (
 __all__ = ["AudioPlayer"]
 
 
+class RepeatSetException(Exception):
+    pass
+
+
 class AudioPlayer:
     recent: List[Union[Episode, Song]]
     upcoming: List[Union[Episode, Song]]
@@ -46,6 +50,7 @@ class AudioPlayer:
     _task: Optional[asyncio.Task] = None
     _voice: Optional[VoiceClient] = None
     _volume: float = 0.25
+    _do_repeat: bool = False
 
     def __init__(self, bot: Bot, xm_state: XMState):
         self._bot = bot
@@ -66,6 +71,23 @@ class AudioPlayer:
             return False
 
         return self._voice.is_playing()
+
+    @property
+    def repeat(self) -> bool:
+        return self._do_repeat
+
+    @repeat.setter
+    def repeat(self, value: bool):
+        if self._playlist_channels is not None:
+            raise RepeatSetException(
+                "Cannot set repeat while playing a SiriusXM Archive playlist"
+            )
+        if self._live is not None:
+            raise RepeatSetException(
+                "Cannot set repeat while playing a SiriusXM live channel"
+            )
+
+        self._do_repeat = value
 
     @property
     def voice(self) -> Union[VoiceClient, None]:
@@ -128,16 +150,17 @@ class AudioPlayer:
         self.upcoming = []
 
         if reset_live and self._live is not None:
-            self._live.stop(self._xm_state)
+            self._xm_state.reset_channel()
+            self._live = None
+
+        self._song_end()
 
         if self._voice is not None:
             if self._voice.is_playing():
                 self._voice.stop()
             if disconnect:
-                self._song_end()
-                self._live = None
                 self._log.debug("Voice disconnection stacktrace:")
-                self._log.debug("\n".join(traceback.format_stack()))
+                self._log.debug("".join(traceback.format_stack()))
                 await self._voice.disconnect()
                 self._voice = None
                 if self._task is not None:
@@ -208,9 +231,13 @@ class AudioPlayer:
         if self._voice is None:
             raise ClientException("Voice client is not set")
 
-        live_stream = LiveStreamInfo(channel)
+        live_stream = None
+        if channel is not None:
+            live_stream = LiveStreamInfo(channel)
+
         item = QueuedItem(audio_file=file_info, live=live_stream)
         self.upcoming.append(item.audio_file)  # type: ignore
+
         await self._queue.put(item)
 
     def _song_end(self, error: Optional[Exception] = None) -> None:
@@ -228,6 +255,7 @@ class AudioPlayer:
         if self._live.is_reset_allowed:
             if not self._live.resetting:
                 self._live.resetting = True
+                self._xm_state.reset_channel()
                 await self.stop(disconnect=False, reset_live=False)
 
                 if delay > 0:
@@ -257,10 +285,13 @@ class AudioPlayer:
                 self._current.source = FFmpegPCMAudio(
                     self._current.audio_file.file_path
                 )
+            # preserve counters in current live info
             elif self._current.live is not None:
+                self._live = self._current.live
+
+            if self._current.live is not None:
+                log_item = self._current.live.channel.id
                 try:
-                    log_item = self._current.live.channel.id
-                    self._live = self._current.live
                     self._log.warn("playing live stream")
                     self._current.source = await self._live.play(  # type: ignore  # noqa
                         self._xm_state
@@ -288,6 +319,19 @@ class AudioPlayer:
 
             if self._playlist_channels is not None and self._queue.qsize() < 5:
                 await self._add_random_playlist_song()
+            elif (
+                self._do_repeat
+                and self._playlist_channels is None
+                and self._current.live is None
+            ):
+                try:
+                    await self._add(file_info=self._current.audio_file)
+                except Exception:
+                    self._log.error(
+                        "Exception while re-add song to queue for repeat:"
+                    )
+                    self._log.error(traceback.format_exc())
+
             self._current = None
 
     async def _read_errors(self):

@@ -4,6 +4,7 @@ import subprocess
 import time
 from typing import List
 
+import psutil
 from discord import AudioSource, FFmpegPCMAudio
 from discord.opus import Encoder as OpusEncoder
 
@@ -91,6 +92,8 @@ class HLSRunner(BaseRunner):
             pass
         finally:
             self.stop()
+        self._log.error("hls runner stopped")
+        exit(0)
 
     def loop(self):
         self._loops += 1
@@ -104,10 +107,14 @@ class HLSRunner(BaseRunner):
 
         self.source.read()
 
+        process = psutil.Process(self.source._process.pid)
+
         if (
             self.state.active_channel_id is None
             or self.state.active_channel_id != self.channel.id
+            or process.status() == psutil.STATUS_ZOMBIE
         ):
+            self._log.error("stopping hls runner")
             self._do_loop = False
         next_time = self._start + DELAY * self._loops
         self._delay = max(0, DELAY + (next_time - time.time()))
