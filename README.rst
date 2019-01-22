@@ -2,8 +2,8 @@
 Discord SiriusXM Bot
 ====================
 
-.. image:: https://readthedocs.org/projects/siriusxm-discord-bot/badge/?version=latest
-        :target: https://siriusxm-discord-bot.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/mortis-music-discord-bot/badge/?version=latest
+        :target: https://mortis-music-discord-bot.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
 
