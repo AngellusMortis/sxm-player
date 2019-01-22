@@ -35,15 +35,15 @@ non-python requirements.
 Github
 ------
 
-`discord-siriusxm` is not avaible on PyPi quite yet and some of its depenencies
-are not yet either. As a result installting it is a bit more difficult. This
-assumes your Python 3 executable is just `python` if it is not, replace it with
-`python3` or whatever it actually is.
+`discord-mortis-music` is not avaible on PyPi quite yet and some of its
+depenencies are not yet either. As a result installting it is a bit more
+difficult. Thisassumes your Python 3 executable is just `python` if it
+is not, replace it with `python3` or whatever it actually is.
 
 .. code-block:: console
 
-    $ git clone git://github.com/AngellusMortis/discord_siriusxm
-    $ cd discord_siriusxm
+    $ git clone git://github.com/AngellusMortis/mortis_music
+    $ cd mortis_music
     $ python -m venv            # this line and the next are optional
     $ source venv/bin/activate  # but if you do not do it then you have to
     $ python setup.py install   # <- run this command with sudo

@@ -4,7 +4,7 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
-SPHINXPROJ    = discord_siriusxm
+SPHINXPROJ    = mortis_music
 SOURCEDIR     = .
 BUILDDIR      = _build
 

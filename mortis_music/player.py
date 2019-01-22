@@ -55,7 +55,7 @@ class AudioPlayer:
     def __init__(self, bot: Bot, xm_state: XMState):
         self._bot = bot
         self._xm_state = xm_state
-        self._log = logging.getLogger("discord_siriusxm.player")
+        self._log = logging.getLogger("mortis_music.player")
         self._random = SystemRandom()
 
         self.recent = []

@@ -9,7 +9,7 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=.
 set BUILDDIR=_build
-set SPHINXPROJ=discord_siriusxm
+set SPHINXPROJ=mortis_music
 
 if "%1" == "" goto help
 

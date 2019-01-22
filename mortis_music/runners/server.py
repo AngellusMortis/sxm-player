@@ -62,7 +62,7 @@ class ServerRunner(BaseRunner):
     def run(self) -> None:
         """ Runs SiriusXM proxy server """
 
-        request_logger = logging.getLogger("discord_siriusxm.server.request")
+        request_logger = logging.getLogger("mortis_music.server.request")
         request_logger.setLevel(self._request_log_level)
 
         httpd = HTTPServer(

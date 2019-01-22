@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Console script for discord_siriusxm."""
+"""Console script for mortis_music."""
 import logging
 import os
 import signal
@@ -167,7 +167,7 @@ def main(
         XMState.init_state(state_dict)
         lock = manager.Lock()  # type: ignore # pylint: disable=E1101 # noqa
         state = XMState(state_dict, lock)
-        logger = logging.getLogger("discord_siriusxm")
+        logger = logging.getLogger("mortis_music")
 
         process_count = 3
         if output_folder is not None:

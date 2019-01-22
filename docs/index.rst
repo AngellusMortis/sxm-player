@@ -1,4 +1,4 @@
-Welcome to Discord-SiriusXM Bot's documentation!
+Welcome to Mortis Music Bot's documentation!
 ================================================
 
 .. toctree::

@@ -12,7 +12,7 @@ from sxm.models import XMMarker
 
 from .models import Episode, Song
 
-logger = logging.getLogger("discord_siriusxm.utils")
+logger = logging.getLogger("mortis_music.utils")
 
 
 def init_db(

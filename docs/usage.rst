@@ -12,7 +12,7 @@ Everything is outlined via command line via the `--help` option:
 
 .. code-block:: console
 
-    $ dsxm --help
+    $ mortis-music --help
 
 Basic Bot
 ---------
@@ -22,14 +22,14 @@ archived song/show playback.
 
 .. code-block:: console
 
-    $ dsxm --username sxm_username --password sxm_password --token discord_bot_token
+    $ mortis-music --username sxm_username --password sxm_password --token discord_bot_token
 
 SiriusXM Username, SiriusXM password and Discord Bot token arguments are
 optional, if you leave one off, you will be prompted:
 
 .. code-block:: console
 
-    $ dsxm --username sxm_username
+    $ mortis-music --username sxm_username
 
 Username, password, and Discord Bot token can also be passed via the
 `SXM_USERNAME`, `SXM_PASSWORD`, and `DISCORD_TOKEN` environment variables.
@@ -39,14 +39,14 @@ Username, password, and Discord Bot token can also be passed via the
     $ export SXM_USERNAME='sxm_username'
     $ export SXM_PASSWORD='sxm_password'
     $ export DISCORD_TOKEN='discord_bot_token'
-    $ dsxm
+    $ mortis-music
 
 If you are a SiriusXM subscriber in Canada, you will need to change your
 region to `CA`
 
 .. code-block:: console
 
-    $ dsxm -r CA
+    $ mortis-music -r CA
 
 By default, all of the bot commands are prefixed with `/sxm `, if you would
 like that to be something different, you can. This will set the command prefix
@@ -54,7 +54,7 @@ to `$`.
 
 .. code-block:: console
 
-    $ dsxm --prefix $
+    $ mortis-music --prefix $
 
 
 Bot + Archiving/Archive Playback
@@ -65,7 +65,7 @@ and splice files out for the songs/shows that have been played.
 
 .. code-block:: console
 
-    $ dsxm -o /path/to/arhive/folder
+    $ mortis-music -o /path/to/arhive/folder
 
 This will create the following directory structure in the output folder::
 
