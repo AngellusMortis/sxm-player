@@ -1,3 +1,4 @@
+import logging
 import os
 import select
 import subprocess
@@ -5,8 +6,6 @@ import time
 from typing import List
 
 import psutil
-from discord import AudioSource, FFmpegPCMAudio
-from discord.opus import Encoder as OpusEncoder
 
 from sxm.models import XMChannel
 
@@ -15,12 +14,99 @@ from .base import BaseRunner
 __all__ = ["HLSRunner"]
 
 
-DELAY = OpusEncoder.FRAME_LENGTH / 1000.0
+# ripped Discord's FFmpegPCMAudio class to remove Discord dependency
+# from this section of code
+# https://github.com/Rapptz/discord.py/blob/rewrite/discord/player.py
+SAMPLING_RATE = 48000
+FRAME_LENGTH = 20
+SAMPLE_SIZE = 4  # (bit_rate / 8) * CHANNELS (bit_rate == 16)
+SAMPLES_PER_FRAME = int(SAMPLING_RATE / 1000 * FRAME_LENGTH)
+FRAME_SIZE = SAMPLES_PER_FRAME * SAMPLE_SIZE
+DELAY = FRAME_LENGTH / 1000.0
+
+
+class HLSAudio:
+    def __init__(self, source, udp_url, *, stream_file="", stderr=None):
+
+        self._log = logging.getLogger("mortis_music.ffmpeg")
+
+        args = [
+            "ffmpeg",
+            "-loglevel",
+            "warning",
+            "-f",
+            "hls",
+            "-i",
+            source,
+            "-f",
+            "s16le",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "-af",
+            "adelay=3000|3000",
+            "-listen",
+            "1",
+            udp_url,
+            stream_file,
+            "-f",
+            "s16le",
+            "-ar",
+            "48000",
+            "-ac",
+            "2",
+            "pipe:1",
+        ]
+
+        self._process = None
+        self._process = subprocess.Popen(
+            args, stdout=subprocess.PIPE, stderr=stderr
+        )
+        self._stdout = self._process.stdout
+
+        self._log.info(
+            f"ffmpeg processed started with pid {self._process.pid}"
+        )
+
+    def __del__(self):
+        self.cleanup()
+
+    def read(self):
+        ret = self._stdout.read(FRAME_SIZE)
+        if len(ret) != FRAME_SIZE:
+            return b""
+        return ret
+
+    def cleanup(self):
+        proc = self._process
+        if proc is None:
+            return
+
+        self._log.info("Preparing to terminate ffmpeg process %s.", proc.pid)
+        proc.kill()
+        if proc.poll() is None:
+            self._log.info(
+                f"ffmpeg process {proc.pid} has not terminated. Waiting "
+                f"to terminate..."
+            )
+            proc.communicate()
+            self._log.info(
+                f"ffmpeg process {proc.pid} should have terminated with a "
+                f"return code of {proc.returncode}."
+            )
+        else:
+            self._log.info(
+                f"ffmpeg process {proc.pid} successfully terminated with "
+                f"return code of {proc.returncode}."
+            )
+
+        self._process = None
 
 
 class HLSRunner(BaseRunner):
     channel: XMChannel
-    source: AudioSource
+    source: HLSAudio
     stderr_poll: select.poll  # pylint: disable=E1101
     stream_url: str
 
@@ -41,9 +127,8 @@ class HLSRunner(BaseRunner):
             #     os.remove(socket_file)
 
             # options = f'unix:/{socket_file}'
-            options = f"udp://127.0.0.1:{port}"
-            self.state.stream_url = options
-            options = f'-af "adelay=3000|3000" -listen 1 {options}'
+            udp_url = f"udp://127.0.0.1:{port}"
+            stream_file = ""
 
             log_message = f"playing {self.stream_url}"
             if self.state.stream_folder is not None:
@@ -54,15 +139,15 @@ class HLSRunner(BaseRunner):
                 if os.path.exists(stream_file):
                     os.remove(stream_file)
 
-                options = f"{options} file:/{stream_file}"
                 log_message += f" ({stream_file})"
+                stream_file = f"file:/{stream_file}"
 
-        options = f"{options} -f s16le -ar 48000 -ac 2"
+        self.state.stream_url = udp_url
         self._log.info(log_message)
-        self.source = FFmpegPCMAudio(
-            self.stream_url,
-            before_options="-loglevel fatal -f hls",
-            options=options,
+        self.source = HLSAudio(
+            source=self.stream_url,
+            udp_url=udp_url,
+            stream_file=stream_file,
             stderr=subprocess.PIPE,
         )
 

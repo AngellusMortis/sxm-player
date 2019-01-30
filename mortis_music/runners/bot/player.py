@@ -18,16 +18,10 @@ from sqlalchemy import and_
 
 from sxm.models import XMChannel
 
-from .models import (
-    Episode,
-    LiveStreamInfo,
-    QueuedItem,
-    SiriusXMActivity,
-    Song,
-    XMState,
-)
+from ...models import Episode, Song, XMState
+from .models import LiveStreamInfo, QueuedItem, SiriusXMActivity
 
-__all__ = ["AudioPlayer"]
+__all__ = ["AudioPlayer", "RepeatSetException"]
 
 
 class RepeatSetException(Exception):

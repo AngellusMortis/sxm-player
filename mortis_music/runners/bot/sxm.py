@@ -14,10 +14,10 @@ from tabulate import tabulate
 from sxm.models import XMImage, XMSong
 
 from ...models import Episode, Song, XMState
-from ...player import AudioPlayer
 from .checks import require_voice
-from .commands import MusicPlayerGroup, SXMCommand
 from .converters import XMChannelConverter, XMChannelListConverter
+from .models import MusicPlayerGroup, SXMCommand
+from .player import AudioPlayer
 from .utils import send_message
 
 

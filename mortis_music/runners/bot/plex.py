@@ -9,7 +9,7 @@ from plexapi.server import PlexServer
 
 from ...models import Episode, Song
 from .checks import require_voice
-from .commands import MusicPlayerGroup, PlexCommand
+from .models import MusicPlayerGroup, PlexCommand
 from .utils import send_message
 
 
