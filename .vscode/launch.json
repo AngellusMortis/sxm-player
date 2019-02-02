@@ -11,6 +11,7 @@
         "args": [
             "--config-file", "${workspaceFolder}/.env.yml", "-l", "discord.log", "-vv"
         ],
-        "console": "integratedTerminal"
+        "console": "integratedTerminal",
+        "subProcess": true
     }]
 }

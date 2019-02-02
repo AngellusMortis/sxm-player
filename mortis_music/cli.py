@@ -5,21 +5,22 @@ import logging
 import os
 import signal
 import time
-from multiprocessing import Manager, Pool
+from multiprocessing import Manager, Pool, set_start_method
+from typing import Optional, Type
 
 import click
-import coloredlogs
 
 from .models import XMState
 from .runners import (
     ArchiveRunner,
+    BaseRunner,
     BotRunner,
     HLSRunner,
     ProcessorRunner,
     ServerRunner,
     run,
 )
-from .utils import CustomCommandClass
+from .utils import CustomCommandClass, configure_root_logger
 
 
 @click.command(cls=CustomCommandClass)
@@ -165,14 +166,13 @@ def main(
     request_level = logging.WARN
 
     if debug:
+        set_start_method("spawn")
         level = "DEBUG"
         request_level = logging.DEBUG
     elif verbose:
         request_level = logging.INFO
 
-    if log_file is not None:
-        logging.basicConfig(filename=log_file)
-    coloredlogs.install(level=level)
+    configure_root_logger(level, log_file)
 
     with Manager() as manager:
         state_dict = manager.dict()  # type: ignore
@@ -197,17 +197,32 @@ def main(
                 state.set_runner(name, None)
                 return False
 
+        if debug:
+            init_worker = None  # type: ignore # noqa
+
         with Pool(processes=process_count, initializer=init_worker) as pool:
+
+            def spawn_process(
+                cls: Type[BaseRunner], kwargs: Optional[dict] = None
+            ):
+                if kwargs is None:
+                    kwargs = {}
+
+                pool.apply_async(
+                    func=run,
+                    args=(cls, state_dict, lock, level, log_file),
+                    kwds=kwargs,
+                )
+
             try:
                 base_url = f"http://{host}:{port}"
                 while True:
                     delay = 0.1
 
                     if not is_running("server"):
-                        pool.apply_async(
-                            func=run,
-                            args=(ServerRunner, state_dict, lock),
-                            kwds={
+                        spawn_process(
+                            ServerRunner,
+                            {
                                 "port": port,
                                 "ip": host,
                                 "username": username,
@@ -219,10 +234,9 @@ def main(
                         delay = 5
 
                     if not is_running("bot"):
-                        pool.apply_async(
-                            func=run,
-                            args=(BotRunner, state_dict, lock),
-                            kwds={
+                        spawn_process(
+                            BotRunner,
+                            {
                                 "prefix": prefix,
                                 "description": description,
                                 "token": token,
@@ -236,26 +250,19 @@ def main(
 
                     if output_folder is not None:
                         if not is_running("archiver"):
-                            pool.apply_async(
-                                func=run,
-                                args=(ArchiveRunner, state_dict, lock),
-                            )
+                            spawn_process(ArchiveRunner)
                             delay = 5
 
                         if not is_running("processor"):
-                            pool.apply_async(
-                                func=run,
-                                args=(ProcessorRunner, state_dict, lock),
-                                kwds={"reset_songs": reset_songs},
+                            spawn_process(
+                                ProcessorRunner, {"reset_songs": reset_songs}
                             )
                             delay = 5
 
                     if state.active_channel_id is not None:
                         if not is_running("hls"):
-                            pool.apply_async(
-                                func=run,
-                                args=(HLSRunner, state_dict, lock),
-                                kwds={"base_url": base_url, "port": port},
+                            spawn_process(
+                                HLSRunner, {"base_url": base_url, "port": port}
                             )
                             delay = 5
 

@@ -1,6 +1,6 @@
 import logging
 import traceback
-from typing import Type
+from typing import Optional, Type
 from multiprocessing import Lock
 
 from .archiver import ArchiveRunner
@@ -24,6 +24,8 @@ def run(
     cls: Type[BaseRunner],
     state_dict: dict,
     lock: Lock,  # type: ignore
+    log_level: str,
+    log_file: Optional[str] = None,
     *args,
     **kwargs
 ) -> None:
@@ -31,6 +33,8 @@ def run(
 
     kwargs["state_dict"] = state_dict
     kwargs["lock"] = lock
+    kwargs["log_level"] = log_level
+    kwargs["log_file"] = log_file
 
     try:
         runner = cls(*args, **kwargs)  # type: ignore

@@ -5,6 +5,7 @@ import subprocess
 from typing import List, Optional, Union
 
 import click
+import coloredlogs
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
@@ -113,6 +114,16 @@ def splice_file(
     else:
         logger.info(f"spliced file: {output_file}")
         return output_file
+
+
+def configure_root_logger(level: str, log_file: Optional[str] = None):
+    root_logger = logging.getLogger()
+    if len(root_logger.handlers) == 0:
+        if log_file is not None:
+            fh = logging.FileHandler(log_file)
+            fh.setLevel(level)
+            root_logger.addHandler(fh)
+        coloredlogs.install(level=level, logger=root_logger)
 
 
 class CustomCommandClass(click.Command):
