@@ -5,24 +5,30 @@
 
 from setuptools import find_packages, setup
 
+# for pip >= 10
+try:
+    from pip._internal.req import parse_requirements
+# for pip <= 9.0.3
+except ImportError:
+    from pip.req import parse_requirements
+from setuptools import find_packages, setup
+
 with open("README.rst") as readme_file:
     readme = readme_file.read()
 
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = [
-    "aiohttp<3.5.0",
-    "click>=7.0",
-    "coloredlogs",
-    "discord.py[voice]",
-    "humanize",
-    "plexapi",
-    "psutil",
-    "sqlalchemy",
-    "sxm==0.1.0",
-    "tabulate",
-]
+req_files = {
+    "dev": "reqs/dev.in",
+    "requirements": "reqs/requirements.in",
+    "setup": "reqs/setup.in",
+}
+
+requirements = {}
+for req, req_file in req_files.items():
+    reqs = parse_requirements(req_file, session="fake")
+    requirements[req] = [str(req.req) for req in reqs]
 
 setup_requirements = ["pytest-runner"]
 
@@ -46,7 +52,7 @@ setup(
     ],
     description="A Discord bot that will play SiriusXM radio stations.",
     entry_points={"console_scripts": ["mortis-music=mortis_music.cli:main"]},
-    install_requires=requirements,
+    install_requires=requirements["requirements"],
     dependency_links=[
         "https://github.com/Rapptz/discord.py/tarball/rewrite#egg=discord.py",
         "https://github.com/AngellusMortis/SiriusXM/tarball/master#egg=sxm",
@@ -57,10 +63,11 @@ setup(
     keywords="mortis_music",
     name="mortis_music",
     packages=find_packages(include=["mortis_music"]),
-    setup_requires=setup_requirements,
+    setup_requires=requirements["setup"],
     test_suite="tests",
-    tests_require=test_requirements,
+    tests_require=requirements["dev"],
     url="https://github.com/AngellusMortis/mortis_music",
     version="0.1.0",
     zip_safe=False,
+    extras_require={"dev": requirements["dev"]},
 )

@@ -1,0 +1,36 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [{
+            "label": "Create Virtual Env",
+            "type": "shell",
+            "command": "python3 -m venv venv",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Python Setup",
+            "type": "shell",
+            "command": "venv/bin/python setup.py develop",
+            "group": "build",
+            "problemMatcher": [],
+            "dependsOn": ["Create Virtual Env"]
+        },
+        {
+            "label": "Install Requirements",
+            "type": "shell",
+            "command": "venv/bin/pip install -e \".[dev]\"",
+            "group": "build",
+            "problemMatcher": [],
+            "dependsOn": ["Python Setup"]
+        },
+        {
+            "label": "Install Local SXM",
+            "type": "shell",
+            "command": "venv/bin/pip install -e ../SiriusXM",
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}

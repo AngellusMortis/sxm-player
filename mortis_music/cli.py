@@ -4,7 +4,6 @@
 import logging
 import os
 import signal
-import sys
 import time
 from multiprocessing import Manager, Pool
 
@@ -20,23 +19,15 @@ from .runners import (
     ServerRunner,
     run,
 )
+from .utils import CustomCommandClass
 
 
-@click.command()
+@click.command(cls=CustomCommandClass)
 @click.option(
-    "--username",
-    type=str,
-    prompt=True,
-    envvar="SXM_USERNAME",
-    help="SiriusXM Username",
+    "--username", type=str, envvar="SXM_USERNAME", help="SiriusXM Username"
 )
 @click.option(
-    "--password",
-    type=str,
-    prompt=True,
-    hide_input=True,
-    envvar="SXM_PASSWORD",
-    help="SiriusXM Password",
+    "--password", type=str, envvar="SXM_PASSWORD", help="SiriusXM Password"
 )
 @click.option(
     "-r",
@@ -46,11 +37,7 @@ from .runners import (
     help="Sets the SiriusXM client's region",
 )
 @click.option(
-    "--token",
-    type=str,
-    prompt=True,
-    envvar="DISCORD_TOKEN",
-    help="Discord bot token",
+    "--token", type=str, envvar="DISCORD_TOKEN", help="Discord bot token"
 )
 @click.option(
     "--prefix", type=str, default="/music ", help="Discord bot command prefix"
@@ -81,6 +68,7 @@ from .runners import (
     "--output-folder",
     type=click.Path(),
     default=None,
+    envvar="MUSIC_OUTPUT_FOLDER",
     help="output folder to save stream off to as it plays them",
 )
 @click.option(
@@ -127,6 +115,9 @@ from .runners import (
     is_flag=True,
     help="enable verbose logging (shows HTTP requests)",
 )
+@click.option(
+    "--config-file", type=click.Path(), help="Config file to read vars from"
+)
 @click.option("-vv", "--debug", is_flag=True, help="enable debug logging")
 def main(
     username: str,
@@ -146,8 +137,29 @@ def main(
     plex_password: str,
     plex_server_name: str,
     plex_library_name: str,
+    config_file: str,
 ):
     """Command line interface for SiriusXM radio bot for Discord"""
+
+    context = click.get_current_context()
+    if username is None:
+        raise click.BadParameter(
+            "SiriusXM Username is required",
+            ctx=context,
+            param=context.params.get("username"),
+        )
+    elif password is None:
+        raise click.BadParameter(
+            "SiriusXM Password is required",
+            ctx=context,
+            param=context.params.get("password"),
+        )
+    elif token is None:
+        raise click.BadParameter(
+            "Discord Token is required",
+            ctx=context,
+            param=context.params.get("token"),
+        )
 
     level = "INFO"
     request_level = logging.WARN
@@ -255,7 +267,3 @@ def main(
                 pool.terminate()
                 pool.join()
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())  # pragma: no cover, pylint: disable=E1120

@@ -1,0 +1,10 @@
+click>=7.0
+coloredlogs
+discord.py[voice]
+humanize
+plexapi
+psutil
+pyyaml
+sqlalchemy
+sxm
+tabulate

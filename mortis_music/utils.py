@@ -4,10 +4,12 @@ import os
 import subprocess
 from typing import List, Optional, Union
 
+import click
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
 
+import yaml
 from sxm.models import XMMarker
 
 from .models import Episode, Song
@@ -111,3 +113,17 @@ def splice_file(
     else:
         logger.info(f"spliced file: {output_file}")
         return output_file
+
+
+class CustomCommandClass(click.Command):
+    def invoke(self, ctx):
+        config_file = ctx.params["config_file"]
+
+        if config_file is not None and os.path.exists(config_file):
+            with open(config_file) as f:
+                config_data = yaml.load(f)
+                for param, value in ctx.params.items():
+                    if value is None and param in config_data:
+                        ctx.params[param] = config_data[param]
+
+        return super(CustomCommandClass, self).invoke(ctx)

@@ -1,0 +1,16 @@
+black
+coverage
+coveralls
+flake8
+mypy
+pip-tools
+pylama
+pylint
+pytest
+pytest-cov
+pytest-django
+sphinx
+sphinx-rtd-theme
+tox
+twine
+versioneer
