@@ -15,6 +15,15 @@ from sxm.models import XMMarker
 
 from .models import Episode, Song
 
+unrelated_loggers = [
+    "discord.client",
+    "discord.gateway",
+    "discord.http",
+    "plexapi",
+    "urllib3.connectionpool",
+    "websockets.protocol",
+]
+
 logger = logging.getLogger("mortis_music.utils")
 
 
@@ -124,6 +133,9 @@ def configure_root_logger(level: str, log_file: Optional[str] = None):
             fh.setLevel(level)
             root_logger.addHandler(fh)
         coloredlogs.install(level=level, logger=root_logger)
+
+    for logger in unrelated_loggers:
+        logging.getLogger(logger).setLevel(logging.INFO)
 
 
 class CustomCommandClass(click.Command):
