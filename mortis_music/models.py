@@ -91,7 +91,7 @@ class DictState:
     lock: Lock  # type: ignore
     _state_dict: dict
     _log: logging.Logger
-    _lock_debuging: bool = False
+    _lock_debuging: bool = True
 
     def __init__(self, state_dict: dict, lock: Lock):  # type: ignore
         self._lock = lock  # type: ignore
@@ -310,14 +310,22 @@ class XMState(DictState):
     def set_channel(self, channel_id: str) -> None:
         """ Sets active SiriusXM channel """
 
-        self.active_channel_id = channel_id
-        self.live = None
+        self._lock_debug("acquiring lock: set_channel")
+        with self._lock:
+            self._state_dict["active_channel_id"] = channel_id
+            self._state_dict["live"] = None
+            self._live = None
+            self._state_dict["start_time"] = None
 
     def reset_channel(self) -> None:
         """ Removes active SiriusXM channel """
 
-        self.active_channel_id = None  # type: ignore
-        self.live = None
+        self._lock_debug("acquiring lock: reset_channel")
+        with self._lock:
+            self._state_dict["active_channel_id"] = None
+            self._state_dict["live"] = None
+            self._live = None
+            self._state_dict["start_time"] = None
 
     def pop_hls_errors(self) -> Union[List[str], None]:
         errors = None

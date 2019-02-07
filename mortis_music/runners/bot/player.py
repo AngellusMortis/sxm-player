@@ -139,7 +139,10 @@ class AudioPlayer:
 
         if self._current is not None:
             if self._current.source is not None:
-                self._current.source.cleanup()
+                try:
+                    self._current.source.cleanup()
+                except ProcessLookupError:
+                    pass
             self._current = None
 
         self.recent = []
@@ -348,7 +351,7 @@ class AudioPlayer:
                     self._log.warn(
                         "Receiving 503 errors from SiriusXM, pausing stream"
                     )
-                    await self._reset_live_stream(30)
+                    await self._reset_live_stream(10)
                 else:
                     self._log.warn(line)
 
@@ -385,15 +388,17 @@ class AudioPlayer:
                             f"could not retrieve live stream data, resetting"
                         )
                         await self._reset_live_stream()
-                # elif self._live is not None and not self._live.resetting:
-                #     self._log.warn(f"live stream lost, resetting")
-                #     await self._reset_live_stream()
             elif self._voice is not None:
                 if self.current is None:
-                    self._log.debug("nothing is playing... stopping")
-                    await self.stop()
-                else:
+                    if self._live is not None:
+                        if not self._live.resetting:
+                            self._log.warn(f"live stream lost, resetting")
+                            await self._reset_live_stream()
+                    else:
+                        self._log.debug("nothing is playing... stopping")
+                        await self.stop()
+                elif self.current.audio_file is not None:
                     self._log.debug("updating activity")
-                    activity = Game(name=self._current.audio_file.pretty_name)
+                    activity = Game(name=self.current.audio_file.pretty_name)
 
             await self._bot.change_presence(activity=activity)

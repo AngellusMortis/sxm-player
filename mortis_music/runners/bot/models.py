@@ -27,23 +27,24 @@ class LiveStreamInfo:
 
         self.resetting = True
 
-        if state.active_channel_id is not self.channel.id:
+        active_channel_id = state.active_channel_id
+        if active_channel_id is not self.channel.id:
             state.set_channel(self.channel.id)
 
             start = time.time()
             now = start
-            can_start = False
-            while not can_start and now - start < 30:
+            stream_url = None
+            while stream_url is None and now - start < 30:
                 await asyncio.sleep(0.1)
                 now = time.time()
-                if state.stream_url is not None and (now - start) > 5:
-                    can_start = True
+                if (now - start) > 5:
+                    stream_url = state.stream_url
 
-            if not can_start:
+            if stream_url is None:
                 raise CommandError("HLS stream not found")
 
         playback_source = FFmpegPCMAudio(
-            state.stream_url,
+            stream_url,
             before_options="-f s16le -ar 48000 -ac 2",
             options="-loglevel fatal",
         )
