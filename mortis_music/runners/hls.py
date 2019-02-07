@@ -177,7 +177,7 @@ class HLSRunner(BaseRunner):
             pass
         finally:
             self.stop()
-        self._log.error("hls runner stopped")
+        self._log.debug("hls runner stopped")
         exit(0)
 
     def loop(self):
@@ -188,18 +188,26 @@ class HLSRunner(BaseRunner):
             lines.append(self.source._process.stderr.readline().decode("utf8"))
 
         if len(lines) > 0:
+            self._log.debug(f"adding {len(lines)} of stderr to shared memory")
             self.state.push_hls_errors(lines)
 
         self.source.read()
 
         process = psutil.Process(self.source._process.pid)
 
-        if (
-            self.state.active_channel_id is None
-            or self.state.active_channel_id != self.channel.id
-            or process.status() == psutil.STATUS_ZOMBIE
+        if self.state.active_channel_id is None:
+            self._log.debug("active_channel_id is None, stopping hls runner")
+            self._do_loop = False
+        elif self.state.active_channel_id != self.channel.id:
+            self._log.debug(
+                "active_channel_id has changed, stopping hls runner"
+            )
+            self._do_loop = False
+        elif process.status() not in (
+            psutil.STATUS_RUNNING,
+            psutil.STATUS_SLEEPING,
         ):
-            self._log.error("stopping hls runner")
+            self._log.debug("ffmpeg process is dead, stopping hls runner")
             self._do_loop = False
         next_time = self._start + DELAY * self._loops
         self._delay = max(0, DELAY + (next_time - time.time()))

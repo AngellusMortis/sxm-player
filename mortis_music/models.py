@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from datetime import datetime
@@ -89,16 +90,23 @@ class DictState:
 
     lock: Lock  # type: ignore
     _state_dict: dict
+    _log: logging.Logger
+    _lock_debuging: bool = False
 
     def __init__(self, state_dict: dict, lock: Lock):  # type: ignore
         self._lock = lock  # type: ignore
         self._state_dict = state_dict
+        self._log = logging.getLogger("mortis_music.shared_dict")
 
     def __getattr__(self, attr: str):
         if not attr.startswith("_") and self._state_dict is not None:
-            with self._lock:
-                if attr in self._state_dict:
-                    return self._state_dict[attr]
+            acquired = self._optional_lock(f"get {attr}")
+
+            if attr in self._state_dict:
+                value = self._state_dict[attr]
+                if acquired:
+                    self._lock.release()
+                return value
         else:
             raise AttributeError(
                 "--%r object has no attribute %r" % (type(self).__name__, attr)
@@ -106,10 +114,23 @@ class DictState:
 
     def __setattr__(self, attr: str, value) -> None:
         if not attr.startswith("_") and self._state_dict is not None:
+            self._lock_debug(f"acquiring lock: set {attr}")
             with self._lock:
+                self._lock_debug(f"acquired lock: set {attr}")
                 if attr in self._state_dict:
                     self._state_dict[attr] = value
+            self._lock_debug(f"released lock: set {attr}")
         super().__setattr__(attr, value)
+
+    def _optional_lock(self, name):
+        acquired = self._lock.acquire(False)
+        if not acquired:
+            self._lock_debug(f"failed to acquire lock: {name}")
+        return acquired
+
+    def _lock_debug(self, message):
+        if self._lock_debuging:
+            self._log.debug(message)
 
 
 class XMState(DictState):
@@ -156,59 +177,70 @@ class XMState(DictState):
     def channels(self) -> List[XMChannel]:
         """ Returns list of `XMChannel` """
 
-        with self._lock:
-            if self._channels is None:
-                self._channels = []
-                for channel in self._state_dict["channels"]:
-                    self._channels.append(XMChannel(channel))
-            return self._channels
+        if self._channels is None:
+            acquired = self._optional_lock("property.get channels")
+
+            self._channels = []
+            for channel in self._state_dict["channels"]:
+                self._channels.append(XMChannel(channel))
+
+            if acquired:
+                self._lock.release()
+        return self._channels
 
     @channels.setter
     def channels(self, value: dict) -> None:
         """ Sets channel key in internal `state_dict`. """
 
+        self._lock_debug("acquiring lock: property.set channels")
         with self._lock:
+            self._lock_debug("acquired lock: property.set channels")
             self._channels = None
             self._state_dict["channels"] = value
+        self._lock_debug("released lock: property.set channels")
 
     @property
     def live(self) -> Union[XMLiveChannel, None]:
         """ Returns current `XMLiveChannel` """
 
-        with self._lock:
-            last_update = self._state_dict["live_update_time"]
-            now = int(time.time() * 1000)
-            if self._live is None or self._live_update_time != last_update:
-                if self._state_dict["live"] is not None:
-                    self._live_update_time = last_update
-                    self._live = XMLiveChannel(self._state_dict["live"])
+        acquired = self._optional_lock("property.get live")
+        last_update = self._state_dict["live_update_time"]
+        now = int(time.time() * 1000)
+        if self._live is None or self._live_update_time != last_update:
+            if self._state_dict["live"] is not None:
+                self._live_update_time = last_update
+                self._live = XMLiveChannel(self._state_dict["live"])
 
-                    if self._live.tune_time is not None:
-                        self._state_dict["time_offset"] = (
-                            now - self._live.tune_time
-                        )
+                if self._live.tune_time is not None:
+                    self._state_dict["time_offset"] = (
+                        now - self._live.tune_time
+                    )
 
-                    if self._state_dict["start_time"] is None:
-                        if self._live.tune_time is None:
-                            self._state_dict["start_time"] = now
-                        else:
-                            self._state_dict[
-                                "start_time"
-                            ] = self._live.tune_time
-                else:
-                    self._state_dict["time_offset"] = 0
-            return self._live
+                if self._state_dict["start_time"] is None:
+                    if self._live.tune_time is None:
+                        self._state_dict["start_time"] = now
+                    else:
+                        self._state_dict["start_time"] = self._live.tune_time
+            else:
+                self._state_dict["time_offset"] = 0
+
+        if acquired:
+            self._lock.release()
+        return self._live
 
     @live.setter
     def live(self, value: dict) -> None:
         """ Sets live key in internal `state_dict`. """
 
+        self._lock_debug("acquiring lock: property.set live")
         with self._lock:
+            self._lock_debug("acquired lock: property.set live")
             self._live = None
             self._state_dict["start_time"] = None
             self._state_dict["live"] = value
             if value is not None:
                 self._state_dict["live_update_time"] = time.time()
+        self._lock_debug("released lock: property.set live")
 
     @property
     def radio_time(self) -> Union[int, None]:
@@ -289,20 +321,30 @@ class XMState(DictState):
 
     def pop_hls_errors(self) -> Union[List[str], None]:
         errors = None
+
+        self._lock_debug("acquiring lock: property.get hls_errors")
         with self._lock:
+            self._lock_debug("acquired lock: property.get hls_errors")
             if self._state_dict["hls_errors"] is not None:
                 errors = self._state_dict["hls_errors"]
                 self._state_dict["hls_errors"] = None
+        self._lock_debug("released lock: property.get hls_errors")
         return errors
 
     def push_hls_errors(self, errors) -> None:
+        self._lock_debug("acquiring lock: property.set hls_errors")
         with self._lock:
+            self._lock_debug("acquired lock: property.set hls_errors")
             if self._state_dict["hls_errors"] is not None:
                 errors = self._state_dict["hls_errors"] + errors
-            self.state.hls_errors = errors
+            self._state_dict["hls_errors"] = errors
+        self._lock_debug("released lock: property.set hls_errors")
 
     def set_runner(self, name, pid):
+        self._lock_debug("acquiring lock: property.set runner")
         with self._lock:
+            self._lock_debug("acquired lock: property.set runner")
             runners = self._state_dict["runners"]
             runners[name] = pid
             self._state_dict["runners"] = runners
+        self._lock_debug("released lock: property.set runner")

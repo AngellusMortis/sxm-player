@@ -9,6 +9,7 @@ from .bot import BotRunner
 from .hls import HLSRunner
 from .processor import ProcessorRunner
 from .server import ServerRunner
+from ..utils import configure_root_logger
 
 __all__ = [
     "ArchiveRunner",
@@ -33,8 +34,8 @@ def run(
 
     kwargs["state_dict"] = state_dict
     kwargs["lock"] = lock
-    kwargs["log_level"] = log_level
-    kwargs["log_file"] = log_file
+
+    configure_root_logger(log_level, log_file)
 
     try:
         runner = cls(*args, **kwargs)  # type: ignore

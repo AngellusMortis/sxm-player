@@ -27,6 +27,20 @@ unrelated_loggers = [
 logger = logging.getLogger("mortis_music.utils")
 
 
+class CustomCommandClass(click.Command):
+    def invoke(self, ctx):
+        config_file = ctx.params["config_file"]
+
+        if config_file is not None and os.path.exists(config_file):
+            with open(config_file) as f:
+                config_data = yaml.load(f)
+                for param, value in ctx.params.items():
+                    if value is None and param in config_data:
+                        ctx.params[param] = config_data[param]
+
+        return super(CustomCommandClass, self).invoke(ctx)
+
+
 def init_db(
     base_folder: str,
     cleanup: Optional[bool] = True,
@@ -130,23 +144,13 @@ def configure_root_logger(level: str, log_file: Optional[str] = None):
     if len(root_logger.handlers) == 0:
         if log_file is not None:
             fh = logging.FileHandler(log_file)
+            formatter = logging.Formatter(
+                "%(asctime)s %(name)s[%(process)d] %(levelname)s %(message)s"
+            )
             fh.setLevel(level)
+            fh.setFormatter(formatter)
             root_logger.addHandler(fh)
         coloredlogs.install(level=level, logger=root_logger)
 
     for logger in unrelated_loggers:
         logging.getLogger(logger).setLevel(logging.INFO)
-
-
-class CustomCommandClass(click.Command):
-    def invoke(self, ctx):
-        config_file = ctx.params["config_file"]
-
-        if config_file is not None and os.path.exists(config_file):
-            with open(config_file) as f:
-                config_data = yaml.load(f)
-                for param, value in ctx.params.items():
-                    if value is None and param in config_data:
-                        ctx.params[param] = config_data[param]
-
-        return super(CustomCommandClass, self).invoke(ctx)

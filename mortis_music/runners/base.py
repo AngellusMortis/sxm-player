@@ -3,10 +3,8 @@ import os
 import time
 from dataclasses import dataclass
 from multiprocessing import Lock
-from typing import Optional
 
 from ..models import XMState
-from ..utils import configure_root_logger
 
 
 @dataclass
@@ -23,14 +21,10 @@ class BaseRunner:
         self,
         state_dict: dict,
         lock: Lock,  # type: ignore
-        log_level: str,
-        log_file: Optional[str] = None,
         name: str = "runner",
         delay: int = 1,
         reset_songs: bool = False,
     ):
-
-        configure_root_logger(log_level, log_file)
 
         self._delay = delay
         self._log = logging.getLogger(f"mortis_music.{name}")

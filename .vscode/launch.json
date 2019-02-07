@@ -9,7 +9,7 @@
         "request": "launch",
         "module": "mortis_music",
         "args": [
-            "--config-file", "${workspaceFolder}/.env.yml", "-l", "discord.log", "-vv"
+            "--config-file", "${workspaceFolder}/.env.yml", "-l", "discord.log", "-d"
         ],
         "console": "integratedTerminal",
         "subProcess": true

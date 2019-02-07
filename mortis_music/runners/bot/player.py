@@ -129,6 +129,8 @@ class AudioPlayer:
     ) -> None:
         """ Stops the `AudioPlayer` """
 
+        self._log.debug(f"player stop: {disconnect}, {reset_live}")
+
         while not self._queue.empty():
             self._queue.get_nowait()
 
@@ -153,8 +155,6 @@ class AudioPlayer:
             if self._voice.is_playing():
                 self._voice.stop()
             if disconnect:
-                self._log.debug("Voice disconnection stacktrace:")
-                self._log.debug("".join(traceback.format_stack()))
                 await self._voice.disconnect()
                 self._voice = None
                 if self._task is not None:
@@ -163,6 +163,7 @@ class AudioPlayer:
     async def skip(self) -> bool:
         """ Skips current `QueueItem` """
 
+        self._log.debug("skiping song")
         if self._voice is not None:
             if self._queue.qsize() < 1:
                 await self.stop()
@@ -174,6 +175,7 @@ class AudioPlayer:
     async def add_playlist(self, xm_channels: List[XMChannel]) -> None:
         """ Creates a playlist of random songs from an channel """
 
+        self._log.debug(f"adding playlist: {xm_channels}")
         self._playlist_channels = xm_channels
 
         for _ in range(5):
@@ -182,11 +184,13 @@ class AudioPlayer:
     async def add_live_stream(self, channel: XMChannel) -> None:
         """ Adds HLS live stream to playing queue """
 
+        self._log.debug(f"adding live stream: {channel}")
         await self._add(channel=channel)
 
     async def add_file(self, file_info: Union[Song, Episode]) -> None:
         """ Adds file to playing queue """
 
+        self._log.debug(f"adding file: {file_info}")
         await self._add(file_info=file_info)
 
     async def _add_random_playlist_song(self) -> None:
@@ -230,6 +234,7 @@ class AudioPlayer:
             live_stream = LiveStreamInfo(channel)
 
         item = QueuedItem(audio_file=file_info, live=live_stream)
+        self._log.debug(f"adding queued item: {item}")
         self.upcoming.append(item.audio_file)  # type: ignore
 
         await self._queue.put(item)
@@ -237,7 +242,9 @@ class AudioPlayer:
     def _song_end(self, error: Optional[Exception] = None) -> None:
         """ Callback for `discord.AudioPlayer`/`discord.VoiceClient` """
 
-        self._bot.loop.call_soon_threadsafe(self._event.set)
+        self._log.debug("song end")
+        if not self._bot.loop.is_closed():
+            self._bot.loop.call_soon_threadsafe(self._event.set)
 
     async def _reset_live_stream(self, delay: int = 0) -> None:
         """ Stop and restart the existing HLS live stream """
@@ -248,11 +255,13 @@ class AudioPlayer:
 
         if self._live.is_reset_allowed:
             if not self._live.resetting:
+                self._log.debug("resetting live")
                 self._live.resetting = True
                 self._xm_state.reset_channel()
                 await self.stop(disconnect=False, reset_live=False)
 
                 if delay > 0:
+                    self._log.debug(f"reset live delay: {delay}")
                     await asyncio.sleep(delay)
 
                 await self.add_live_stream(self._live.channel)
@@ -267,11 +276,13 @@ class AudioPlayer:
         while True:
             self._event.clear()
             self._current = await self._queue.get()
+            self._log.debug(f"audio player, new item: {self._current}")
 
             if len(self.upcoming) > 0:
                 self.upcoming.pop(0)
 
             if self._current.audio_file is not None:
+                self._log.debug("playing audio file")
                 self.recent.insert(0, self._current.audio_file)
                 self.recent = self.recent[:10]
 
@@ -286,7 +297,7 @@ class AudioPlayer:
             if self._current.live is not None:
                 log_item = self._current.live.channel.id
                 try:
-                    self._log.warn("playing live stream")
+                    self._log.debug("playing live stream")
                     self._current.source = await self._live.play(  # type: ignore  # noqa
                         self._xm_state
                     )
@@ -337,7 +348,7 @@ class AudioPlayer:
                     self._log.warn(
                         "Receiving 503 errors from SiriusXM, pausing stream"
                     )
-                    await self._reset_live_stream(10)
+                    await self._reset_live_stream(30)
                 else:
                     self._log.warn(line)
 
@@ -359,6 +370,7 @@ class AudioPlayer:
 
                 if self.is_playing and self._live is not None:
                     if self._xm_state.live is not None:
+                        self._log.debug("updating SXM activity")
                         self._live.reset_counters()
                         activity = SiriusXMActivity(
                             start=self._xm_state.start_time,
@@ -373,13 +385,15 @@ class AudioPlayer:
                             f"could not retrieve live stream data, resetting"
                         )
                         await self._reset_live_stream()
-                elif self._live is not None and not self._live.resetting:
-                    self._log.warn(f"live stream lost, resetting")
-                    await self._reset_live_stream()
-            elif self.is_playing:
+                # elif self._live is not None and not self._live.resetting:
+                #     self._log.warn(f"live stream lost, resetting")
+                #     await self._reset_live_stream()
+            elif self._voice is not None:
                 if self.current is None:
+                    self._log.debug("nothing is playing... stopping")
                     await self.stop()
                 else:
+                    self._log.debug("updating activity")
                     activity = Game(name=self._current.audio_file.pretty_name)
 
             await self._bot.change_presence(activity=activity)

@@ -24,7 +24,6 @@ class ServerRunner(BaseRunner):
         username: str,
         password: str,
         region: str,
-        request_log_level: int = logging.WARN,
         *args,
         **kwargs,
     ):
@@ -33,7 +32,6 @@ class ServerRunner(BaseRunner):
 
         self._port = port
         self._ip = ip
-        self._request_log_level = request_log_level
 
         self.sxm = SiriusXMClient(
             username=username,
@@ -50,7 +48,7 @@ class ServerRunner(BaseRunner):
         `SiriusXMClient.get_playlist` when a HLS playlist updates """
 
         def update_handler(data: dict) -> None:
-            self._log.debug(f"update data: {data}")
+            self._log.debug(f"received update data for: {data['channelId']}")
             if self.state.active_channel_id == data["channelId"]:
                 self._log.info(
                     f"{self.state.active_channel_id}: updating channel data"
@@ -63,10 +61,12 @@ class ServerRunner(BaseRunner):
         """ Runs SiriusXM proxy server """
 
         request_logger = logging.getLogger("mortis_music.server.request")
-        request_logger.setLevel(self._request_log_level)
 
         httpd = HTTPServer(
-            (self._ip, self._port), make_http_handler(self.sxm, request_logger)
+            (self._ip, self._port),
+            make_http_handler(
+                self.sxm, request_logger, request_level=logging.DEBUG
+            ),
         )
         try:
             self._log.info(

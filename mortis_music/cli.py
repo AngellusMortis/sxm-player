@@ -104,22 +104,12 @@ from .utils import CustomCommandClass, configure_root_logger
     help="Plex library name for local server",
 )
 @click.option(
-    "-l",
-    "--log-file",
-    type=click.Path(),
-    default=None,
-    help="enable verbose logging (shows HTTP requests)",
-)
-@click.option(
-    "-v",
-    "--verbose",
-    is_flag=True,
-    help="enable verbose logging (shows HTTP requests)",
+    "-l", "--log-file", type=click.Path(), default=None, help="output log file"
 )
 @click.option(
     "--config-file", type=click.Path(), help="Config file to read vars from"
 )
-@click.option("-vv", "--debug", is_flag=True, help="enable debug logging")
+@click.option("-d", "--debug", is_flag=True, help="enable debug logging")
 def main(
     username: str,
     password: str,
@@ -131,7 +121,6 @@ def main(
     host: str,
     output_folder: str,
     reset_songs: bool,
-    verbose: bool,
     debug: bool,
     log_file: str,
     plex_username: str,
@@ -163,16 +152,13 @@ def main(
         )
 
     level = "INFO"
-    request_level = logging.WARN
 
     if debug:
         set_start_method("spawn")
         level = "DEBUG"
-        request_level = logging.DEBUG
-    elif verbose:
-        request_level = logging.INFO
 
     configure_root_logger(level, log_file)
+    os.system("clear")
 
     with Manager() as manager:
         state_dict = manager.dict()  # type: ignore
@@ -202,6 +188,8 @@ def main(
 
         with Pool(processes=process_count, initializer=init_worker) as pool:
 
+            base_url = f"http://{host}:{port}"
+
             def spawn_process(
                 cls: Type[BaseRunner], kwargs: Optional[dict] = None
             ):
@@ -215,7 +203,6 @@ def main(
                 )
 
             try:
-                base_url = f"http://{host}:{port}"
                 while True:
                     delay = 0.1
 
@@ -228,7 +215,6 @@ def main(
                                 "username": username,
                                 "password": password,
                                 "region": region,
-                                "request_log_level": request_level,
                             },
                         )
                         delay = 5
@@ -269,6 +255,8 @@ def main(
                     time.sleep(delay)
 
             except KeyboardInterrupt:
+                pass
+            finally:
                 logger.warn("killing runners")
                 pool.close()
                 pool.terminate()
