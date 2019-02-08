@@ -23,6 +23,8 @@ from .models import LiveStreamInfo, QueuedItem, SiriusXMActivity
 
 __all__ = ["AudioPlayer", "RepeatSetException"]
 
+ERROR_PAUSE_DELAY = 10
+
 
 class RepeatSetException(Exception):
     pass
@@ -351,7 +353,11 @@ class AudioPlayer:
                     self._log.warn(
                         "Receiving 503 errors from SiriusXM, pausing stream"
                     )
-                    await self._reset_live_stream(10)
+                    await self._bot.cogs["Music"].bot_output(
+                        f"SiriusXM is having issues, live stream pausing "
+                        f"for {ERROR_PAUSE_DELAY} seconds"
+                    )
+                    await self._reset_live_stream(ERROR_PAUSE_DELAY)
                 else:
                     self._log.warn(line)
 
@@ -387,12 +393,20 @@ class AudioPlayer:
                         self._log.warn(
                             f"could not retrieve live stream data, resetting"
                         )
+                        await self._bot.cogs["Music"].bot_output(
+                            "Live stream data has not be received yet, likely "
+                            "due to SiriusXM issue. Resetting live stream..."
+                        )
                         await self._reset_live_stream()
             elif self._voice is not None:
                 if self.current is None:
                     if self._live is not None:
                         if not self._live.resetting:
                             self._log.warn(f"live stream lost, resetting")
+                            await self._bot.cogs["Music"].bot_output(
+                                "Live stream gone, likely due to SiriusXM "
+                                "issues. Resetting live stream..."
+                            )
                             await self._reset_live_stream()
                     else:
                         self._log.debug("nothing is playing... stopping")

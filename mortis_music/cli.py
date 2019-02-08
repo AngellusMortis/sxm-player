@@ -50,6 +50,11 @@ from .utils import CustomCommandClass, configure_root_logger
     help="port to run SiriusXM Proxy server on",
 )
 @click.option(
+    "--output-channel-id",
+    type=int,
+    help="Discord channel ID for various bot status updates",
+)
+@click.option(
     "-p",
     "--port",
     type=int,
@@ -115,6 +120,7 @@ def main(
     password: str,
     region: str,
     token: str,
+    output_channel_id: int,
     prefix: str,
     description: str,
     port: int,
@@ -226,6 +232,7 @@ def main(
                                 "prefix": prefix,
                                 "description": description,
                                 "token": token,
+                                "output_channel_id": output_channel_id,
                                 "plex_username": plex_username,
                                 "plex_password": plex_password,
                                 "plex_server_name": plex_server_name,

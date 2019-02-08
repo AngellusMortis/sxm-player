@@ -10,10 +10,12 @@ async def send_message(
     if message is None and embed is None:
         raise errors.CommandError("A message or a embed must be provided")
 
-    if isinstance(ctx.message.channel, TextChannel):
+    if isinstance(ctx, TextChannel):
+        channel = ctx
+    elif isinstance(ctx.message.channel, TextChannel):
         if message is not None:
             message = f"{ctx.message.author.mention}{sep}{message}"
         else:
             message = ctx.message.author.mention
 
-    await ctx.message.channel.send(message, embed=embed)
+    await channel.send(message, embed=embed)

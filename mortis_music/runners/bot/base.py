@@ -1,9 +1,10 @@
 import asyncio
 import traceback
-from typing import Union
+from typing import Optional, Union
 
-from discord import Message, TextChannel
+from discord import Message, TextChannel, TextChannel
 from discord.ext.commands import Bot, Context, command, errors
+
 from plexapi.server import PlexServer
 
 from ...models import Episode, Song
@@ -24,13 +25,16 @@ class BotRunner(BaseRunner, PlexCommands, SXMCommands):
     player: AudioPlayer
     prefix: str
     token: str
+    output_channel: Optional[TextChannel] = None
     plex_library: Union[None, PlexServer] = None
+    _output_channel_id: Optional[int] = None
 
     def __init__(
         self,
         prefix: str,
         description: str,
         token: str,
+        output_channel_id: Optional[int],
         plex_username: Union[str, None] = None,
         plex_password: Union[str, None] = None,
         plex_server_name: Union[str, None] = None,
@@ -48,7 +52,10 @@ class BotRunner(BaseRunner, PlexCommands, SXMCommands):
         )
         self.bot.add_cog(self)
 
-        self.bot.cogs["SiriusXM"] = self.bot.cogs.pop("BotRunner")
+        self.bot.cogs["Music"] = self.bot.cogs.pop("BotRunner")
+
+        if output_channel_id is not None:
+            self._output_channel_id = output_channel_id
 
         self.player = AudioPlayer(self.bot, self.state)
 
@@ -93,7 +100,22 @@ class BotRunner(BaseRunner, PlexCommands, SXMCommands):
     # Discord event handlers
     async def on_ready(self) -> None:
         user = self.bot.user
+
+        if self._output_channel_id is not None:
+            for channel in self.bot.get_all_channels():
+                if channel.id == self._output_channel_id:
+                    self.output_channel = channel
+                    break
+
+            if self.output_channel is None:
+                self._log.warn(
+                    f"could not find output channel: {self._output_channel_id}"
+                )
+            else:
+                self._log.info(f"output channel: {self.output_channel.id}")
+
         self._log.info(f"logged in as {user} (id: {user.id})")
+        await self.bot_output(f"Accepting `{self.prefix}` commands")
 
     async def on_command_error(
         self, ctx: Context, error: errors.CommandError
@@ -135,6 +157,10 @@ class BotRunner(BaseRunner, PlexCommands, SXMCommands):
             await self._invalid_command(ctx)
 
     # helper methods
+    async def bot_output(self, message: str):
+        if self.output_channel is not None:
+            await send_message(self.output_channel, message)
+
     async def _invalid_command(self, ctx: Context, group: str = ""):
         help_command = f"{self.prefix}help {group}".strip()
         message = (
