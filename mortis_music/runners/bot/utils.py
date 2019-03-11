@@ -1,4 +1,4 @@
-from discord import TextChannel, Embed
+from discord import DMChannel, Embed, TextChannel
 from discord.ext.commands import errors
 
 __all__ = ["send_message"]
@@ -12,7 +12,8 @@ async def send_message(
 
     if isinstance(ctx, TextChannel):
         channel = ctx
-    elif isinstance(ctx.message.channel, TextChannel):
+    elif isinstance(ctx.message.channel, (DMChannel, TextChannel)):
+        channel = ctx.message.channel
         if message is not None:
             message = f"{ctx.message.author.mention}{sep}{message}"
         else:

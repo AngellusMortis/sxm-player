@@ -2,6 +2,7 @@ import logging
 import os
 import select
 import subprocess
+import tempfile
 import time
 from typing import List
 
@@ -26,7 +27,7 @@ DELAY = FRAME_LENGTH / 1000.0
 
 
 class HLSAudio:
-    def __init__(self, source, udp_url, *, stream_file="", stderr=None):
+    def __init__(self, source, url, *, stream_file="", stderr=None):
 
         self._log = logging.getLogger("mortis_music.ffmpeg")
 
@@ -48,7 +49,7 @@ class HLSAudio:
             "adelay=3000|3000",
             "-listen",
             "1",
-            udp_url,
+            url,
             stream_file,
             "-f",
             "s16le",
@@ -109,6 +110,7 @@ class HLSRunner(BaseRunner):
     source: HLSAudio
     stderr_poll: select.poll  # pylint: disable=E1101
     stream_url: str
+    use_udp: bool = False
 
     _loops: int = 0
     _start: float = 0
@@ -121,13 +123,17 @@ class HLSRunner(BaseRunner):
         if self.channel is not None:
             self.stream_url = f"{base_url}/{self.channel.id}.m3u8"
 
-            # socket_file = os.path.join(
-            #     tempfile.gettempdir(), f'{self.channel.id}.sock')
-            # if os.path.exists(socket_file):
-            #     os.remove(socket_file)
+            if self.use_udp:
+                playback_url = f"udp://127.0.0.1:{port}"
+            else:
+                socket_file = os.path.join(
+                    tempfile.gettempdir(), f"{self.channel.id}.sock"
+                )
+                if os.path.exists(socket_file):
+                    os.remove(socket_file)
 
-            # options = f'unix:/{socket_file}'
-            udp_url = f"udp://127.0.0.1:{port}"
+                playback_url = f"unix:/{socket_file}"
+
             stream_file = ""
 
             log_message = f"playing {self.stream_url}"
@@ -142,11 +148,11 @@ class HLSRunner(BaseRunner):
                 log_message += f" ({stream_file})"
                 stream_file = f"file:/{stream_file}"
 
-        self.state.stream_url = udp_url
+        self.state.stream_url = playback_url
         self._log.info(log_message)
         self.source = HLSAudio(
             source=self.stream_url,
-            udp_url=udp_url,
+            url=playback_url,
             stream_file=stream_file,
             stderr=subprocess.PIPE,
         )

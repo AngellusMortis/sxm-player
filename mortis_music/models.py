@@ -91,7 +91,7 @@ class DictState:
     lock: Lock  # type: ignore
     _state_dict: dict
     _log: logging.Logger
-    _lock_debuging: bool = True
+    _lock_debuging: bool = False
 
     def __init__(self, state_dict: dict, lock: Lock):  # type: ignore
         self._lock = lock  # type: ignore

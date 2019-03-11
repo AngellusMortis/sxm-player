@@ -104,7 +104,7 @@ class AudioPlayer:
         """ Returns current `Song` or `Episode` that is being played """
 
         if self._current is not None:
-            return self._current.audio_file
+            return self._current
         return None
 
     @property

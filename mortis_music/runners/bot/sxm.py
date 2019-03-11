@@ -320,11 +320,11 @@ class SXMCommands:
         await author.send("SiriusXM Channels:")
         while len(channel_table) > 0:
             message = ""
-            if len(channel_table) < 2000:
+            if len(channel_table) < 1900:
                 message = channel_table
                 channel_table = ""
             else:
-                index = channel_table[:2000].rfind("\n")
+                index = channel_table[:1900].rfind("\n")
                 message = channel_table[:index]
                 start = index + 1
                 channel_table = channel_table[start:]
