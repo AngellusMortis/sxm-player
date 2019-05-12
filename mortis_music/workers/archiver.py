@@ -1,64 +1,92 @@
 import os
 import time
-from typing import Union, Tuple, Dict
+from typing import Union, Tuple, Dict, Optional
 
 from ..utils import get_files, splice_file
-from .base import BaseRunner
+from .base import HLSLoopedWorker
+from ..queue import EventMessage
 
-__all__ = ["ArchiveRunner"]
+__all__ = ["ArchiveWorker"]
 
 ARCHIVE_DROPOFF: int = 86400  # 24 hours
-ARCHIVE_CHUNK = 600  # 10 minutes
+ARCHIVE_CHUNK = 600.0  # 10 minutes
 ARCHIVE_BUFFER = 5
 
 
-class ArchiveRunner(BaseRunner):
+class ArchiveWorker(HLSLoopedWorker):
+    NAME = "archiver"
+
+    stream_folder: str
+    archive_folder: str
     last_size: Dict[str, int] = {}
 
-    def __init__(self, *args, **kwargs):
-        kwargs["name"] = "archiver"
+    _delay: float = ARCHIVE_CHUNK
+
+    def __init__(
+        self, stream_folder: str, archive_folder: str, *args, **kwargs
+    ):
         super().__init__(*args, **kwargs)
 
-        self._delay = ARCHIVE_CHUNK
-        if (
-            self.state.stream_folder is not None
-            and self.state.archive_folder is not None
-        ):
-            os.makedirs(self.state.stream_folder, exist_ok=True)
-            os.makedirs(self.state.archive_folder, exist_ok=True)
+        # run in 11 minutes (ARCHIVE_CHUNK + 1 minute) to ensure a
+        # full 10 minutes of audio exists
+        self._last_loop = time.time() + 60
+
+        self.stream_folder = stream_folder
+        self.archive_folder = archive_folder
+
+        os.makedirs(self.stream_folder, exist_ok=True)
+        os.makedirs(self.archive_folder, exist_ok=True)
 
     def loop(self) -> None:
-        active_channel_id = self.state.active_channel_id
-        if active_channel_id is None or self.state.stream_folder is None:
+        if self._state.stream_channel is None or self.stream_folder is None:
+            self.local_shutdown_event.set()  # type: ignore
             return
 
         deleted = 0
         archived = None
-        stream_files = get_files(self.state.stream_folder)
+        stream_files = get_files(self.stream_folder)
 
         for stream_file in stream_files:
-            abs_path = os.path.join(self.state.stream_folder, stream_file)
-            file_parts = stream_file.split(".")
-            if file_parts[-1] != "mp3" or file_parts[0] != active_channel_id:
-                os.remove(abs_path)
-                deleted += 1
-            else:
-                if not self._check_size(abs_path):
-                    self._log.error(
-                        "archive not increasing, resetting channel"
-                    )
-                    self.state.reset_channel()
-                    return
-
-                self.state.processing_file = True
-                archived, removed = self._process_stream_file(abs_path)
-                self.state.processing_file = False
-                deleted += removed
+            abs_path = os.path.join(self.stream_folder, stream_file)
+            archived, removed = self._process_file(abs_path)
+            deleted += removed
 
         self._log.info(
             f"archived: deleted files: {deleted}, "
             f"archived file: {archived}"
         )
+
+    def _process_file(self, abs_path) -> Tuple[Optional[str], int]:
+        archived = None
+        deleted = 0
+
+        if not self._validate_name(abs_path):
+            deleted += 1
+        elif self._validate_size(abs_path):
+            archived, removed = self._process_stream_file(abs_path)
+            deleted += removed
+
+        return (archived, deleted)
+
+    def _validate_name(self, stream_file) -> bool:
+        stream_file = os.path.basename(stream_file)
+        file_parts = stream_file.split(".")
+        if (
+            file_parts[-1] != "mp3"
+            or file_parts[0] != self._state.stream_channel
+        ):
+            os.remove(stream_file)
+            return False
+        return True
+
+    def _validate_size(self, stream_file) -> bool:
+        if not self._check_size(stream_file):
+            self._log.error("archive not increasing, resetting channel")
+            self.push_event(
+                EventMessage(self.name, EventMessage.KILL_HLS_STREAM, None)
+            )
+            return False
+        return True
 
     def _check_size(self, abs_path: str) -> bool:
         current = os.path.getsize(abs_path)
@@ -99,10 +127,10 @@ class ArchiveRunner(BaseRunner):
         """ Processes stream file by creating an archive from
         it if necessary """
 
-        channel_id = self.state.active_channel_id
-        if channel_id is None or self.state.archive_folder is None:
+        channel_id = self._state.stream_channel
+        if channel_id is None or self.archive_folder is None:
             return (None, 0)
-        channel_archive = os.path.join(self.state.archive_folder, channel_id)
+        channel_archive = os.path.join(self.archive_folder, channel_id)
 
         max_archive_cutoff = int(time.time()) - ARCHIVE_BUFFER
         creation_time = int(os.path.getatime(abs_path)) + ARCHIVE_BUFFER
@@ -116,7 +144,7 @@ class ArchiveRunner(BaseRunner):
         archive_chunks = int(time_elapsed / ARCHIVE_CHUNK)
         if archive_chunks > 0:
             os.makedirs(channel_archive, exist_ok=True)
-            time_elapsed = archive_chunks * ARCHIVE_CHUNK
+            time_elapsed = int(archive_chunks * ARCHIVE_CHUNK)
             archive_cutoff = creation_time + time_elapsed
 
             archive_base = f"{channel_id}.{creation_time}"

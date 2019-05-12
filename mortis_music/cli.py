@@ -1,29 +1,45 @@
 # -*- coding: utf-8 -*-
 
 """Console script for mortis_music."""
-import logging
 import os
-import signal
-import time
-from multiprocessing import Manager, Pool, set_start_method
-from typing import Optional, Type
+from multiprocessing import set_start_method
+from typing import Optional
 
 import click
 
+from . import handlers
 from .models import XMState
-from .runners import (
-    ArchiveRunner,
-    BaseRunner,
-    BotRunner,
-    HLSRunner,
-    ProcessorRunner,
-    ServerRunner,
-    run,
-)
-from .utils import CustomCommandClass, configure_root_logger
+from .queue import EventMessage
+from .runner import Runner
+from .utils import CustomCommandClass
+from .workers import DebugWorker, ServerWorker, StatusWorker
 
 
 @click.command(cls=CustomCommandClass)
+# Generic Parameters
+@click.option(
+    "--config-file", type=click.Path(), help="Config file to read vars from"
+)
+@click.option(
+    "-l", "--log-file", type=click.Path(), default=None, help="output log file"
+)
+@click.option("-d", "--debug", is_flag=True, help="enable debug logging")
+# SiriusXM Parameters
+@click.option(
+    "-p",
+    "--port",
+    type=int,
+    default=None,
+    help="port to run SiriusXM Proxy server on",
+)
+@click.option(
+    "-h",
+    "--host",
+    type=str,
+    default=None,
+    help="IP to bind SiriusXM Proxy server to. "
+    "Must still be accessible via 127.0.0.1",
+)
 @click.option(
     "--username", type=str, envvar="SXM_USERNAME", help="SiriusXM Username"
 )
@@ -37,38 +53,7 @@ from .utils import CustomCommandClass, configure_root_logger
     default="US",
     help="Sets the SiriusXM client's region",
 )
-@click.option(
-    "--token", type=str, envvar="DISCORD_TOKEN", help="Discord bot token"
-)
-@click.option(
-    "--prefix", type=str, default="/music ", help="Discord bot command prefix"
-)
-@click.option(
-    "--description",
-    type=str,
-    default="SiriusXM radio bot for Discord",
-    help="port to run SiriusXM Proxy server on",
-)
-@click.option(
-    "--output-channel-id",
-    type=int,
-    help="Discord channel ID for various bot status updates",
-)
-@click.option(
-    "-p",
-    "--port",
-    type=int,
-    default=9999,
-    help="port to run SiriusXM Proxy server on",
-)
-@click.option(
-    "-h",
-    "--host",
-    type=str,
-    default="127.0.0.1",
-    help="IP to bind SiriusXM Proxy server to. "
-    "Must still be accessible via 127.0.0.1",
-)
+# Archiving/Processing parameters
 @click.option(
     "-o",
     "--output-folder",
@@ -80,192 +65,99 @@ from .utils import CustomCommandClass, configure_root_logger
 @click.option(
     "-r", "--reset-songs", is_flag=True, help="reset processed song database"
 )
-@click.option(
-    "--plex-username",
-    type=str,
-    default=None,
-    envvar="PLEX_USERNAME",
-    help="Plex username for local server",
-)
-@click.option(
-    "--plex-password",
-    type=str,
-    default=None,
-    envvar="PLEX_PASSWORD",
-    help="Plex password for local server",
-)
-@click.option(
-    "--plex-server-name",
-    type=str,
-    default=None,
-    envvar="PLEX_SERVER",
-    help="Plex server name for local server",
-)
-@click.option(
-    "--plex-library-name",
-    type=str,
-    default=None,
-    envvar="PLEX_LIBRARY",
-    help="Plex library name for local server",
-)
-@click.option(
-    "-l", "--log-file", type=click.Path(), default=None, help="output log file"
-)
-@click.option(
-    "--config-file", type=click.Path(), help="Config file to read vars from"
-)
-@click.option("-d", "--debug", is_flag=True, help="enable debug logging")
 def main(
+    config_file: str,
+    log_file: str,
+    debug: bool,
     username: str,
     password: str,
     region: str,
-    token: str,
-    output_channel_id: int,
-    prefix: str,
-    description: str,
     port: int,
     host: str,
     output_folder: str,
     reset_songs: bool,
-    debug: bool,
-    log_file: str,
-    plex_username: str,
-    plex_password: str,
-    plex_server_name: str,
-    plex_library_name: str,
-    config_file: str,
 ):
     """Command line interface for SiriusXM radio bot for Discord"""
 
-    context = click.get_current_context()
-    if username is None:
-        raise click.BadParameter(
-            "SiriusXM Username is required",
-            ctx=context,
-            param=context.params.get("username"),
-        )
-    elif password is None:
-        raise click.BadParameter(
-            "SiriusXM Password is required",
-            ctx=context,
-            param=context.params.get("password"),
-        )
-    elif token is None:
-        raise click.BadParameter(
-            "Discord Token is required",
-            ctx=context,
-            param=context.params.get("token"),
-        )
-
-    level = "INFO"
-
     if debug:
         set_start_method("spawn")
-        level = "DEBUG"
 
-    configure_root_logger(level, log_file)
-    os.system("clear")
+    # context = click.get_current_context()
+    os.system("/usr/bin/clear")  # nosec
 
-    with Manager() as manager:
-        state_dict = manager.dict()  # type: ignore
-        XMState.init_state(state_dict)
-        lock = manager.Lock()  # type: ignore # pylint: disable=E1101 # noqa
-        state = XMState(state_dict, lock)
-        logger = logging.getLogger("mortis_music")
+    with Runner(log_file, debug) as runner:
+        if debug and DebugWorker is not None:
+            runner.create_worker(DebugWorker, DebugWorker.NAME)
 
-        process_count = 3
-        if output_folder is not None:
-            state.output = output_folder
-            process_count = 5
+        sxm_state = XMState()
 
-        def init_worker():
-            signal.signal(signal.SIGINT, signal.SIG_IGN)
+        runner.create_worker(
+            StatusWorker, StatusWorker.NAME, port=port, ip=host
+        )
 
-        def is_running(name):
-            try:
-                os.kill(state.runners[name], 0)
-                return True
-            except (KeyError, TypeError, ProcessLookupError):
-                state.set_runner(name, None)
-                return False
+        while not runner.shutdown_event.is_set():  # type: ignore
+            event_loop(**locals())
 
-        if debug:
-            init_worker = None  # type: ignore # noqa
-
-        with Pool(processes=process_count, initializer=init_worker) as pool:
-
-            base_url = f"http://{host}:{port}"
-
-            def spawn_process(
-                cls: Type[BaseRunner], kwargs: Optional[dict] = None
-            ):
-                if kwargs is None:
-                    kwargs = {}
-
-                pool.apply_async(
-                    func=run,
-                    args=(cls, state_dict, lock, level, log_file),
-                    kwds=kwargs,
-                )
-
-            try:
-                while True:
-                    delay = 0.1
-
-                    if not is_running("server"):
-                        spawn_process(
-                            ServerRunner,
-                            {
-                                "port": port,
-                                "ip": host,
-                                "username": username,
-                                "password": password,
-                                "region": region,
-                            },
-                        )
-                        delay = 5
-
-                    if not is_running("bot"):
-                        spawn_process(
-                            BotRunner,
-                            {
-                                "prefix": prefix,
-                                "description": description,
-                                "token": token,
-                                "output_channel_id": output_channel_id,
-                                "plex_username": plex_username,
-                                "plex_password": plex_password,
-                                "plex_server_name": plex_server_name,
-                                "plex_library_name": plex_library_name,
-                            },
-                        )
-                        delay = 5
-
-                    if output_folder is not None:
-                        if not is_running("archiver"):
-                            spawn_process(ArchiveRunner)
-                            delay = 5
-
-                        if not is_running("processor"):
-                            spawn_process(
-                                ProcessorRunner, {"reset_songs": reset_songs}
-                            )
-                            delay = 5
-
-                    if state.active_channel_id is not None:
-                        if not is_running("hls"):
-                            spawn_process(
-                                HLSRunner, {"base_url": base_url, "port": port}
-                            )
-                            delay = 5
-
-                    time.sleep(delay)
-
-            except KeyboardInterrupt:
-                pass
-            finally:
-                logger.warn("killing runners")
-                pool.close()
-                pool.terminate()
-                pool.join()
     return 0
+
+
+def spawn_sxm_worker(
+    runner: Runner,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+    region: str,
+    **kwargs,
+):
+    runner.create_worker(
+        ServerWorker,
+        ServerWorker.NAME,
+        port=port,
+        ip=host,
+        username=username,
+        password=password,
+        region=region,
+    )
+
+
+def event_loop(runner: Runner, sxm_state: XMState, **kwargs):
+    if not sxm_state.is_connected:
+        if sxm_state.mark_attempt(runner.log):
+            spawn_sxm_worker(runner, **kwargs)
+
+    event = runner.event_queue.safe_get()
+
+    if not event:
+        return
+
+    runner.log.debug(f"Received event: {event.msg_src}, {event.msg_type}")
+
+    was_connected: Optional[bool] = None
+    if event.msg_src == ServerWorker.NAME:
+        was_connected = sxm_state.is_connected
+
+    handle_event(event=event, runner=runner, sxm_state=sxm_state, **kwargs)
+
+    if was_connected is False and sxm_state.is_connected:
+        if not was_connected and sxm_state.is_connected:
+            runner.log.info(
+                "SiriusXM Client started. "
+                f"{len(sxm_state.channels)} available"
+            )
+
+            handlers.sxm_status_event(runner, EventMessage.SXM_RUNNING_EVENT)
+
+
+def handle_event(event: EventMessage, **kwargs):
+    runner = kwargs["runner"]
+    debug = kwargs["debug"]
+    is_debug_event = event.msg_type.lower().startswith("debug")
+    handler_name = f"handle_{event.msg_type.lower()}_event"
+
+    if hasattr(handlers, handler_name) and (not is_debug_event or debug):
+        getattr(handlers, handler_name)(event, **kwargs)
+    else:
+        runner.log.warning(
+            f"Unknown event received: {event.msg_src}, {event.msg_type}"
+        )

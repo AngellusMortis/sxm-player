@@ -1,16 +1,17 @@
 import datetime
 import logging
 import os
-import subprocess
+import shlex
+import subprocess  # nosec
 from typing import List, Optional, Union
 
 import click
 import coloredlogs
+import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
 
-import yaml
 from sxm.models import XMMarker
 
 from .models import Episode, Song
@@ -28,17 +29,49 @@ logger = logging.getLogger("mortis_music.utils")
 
 
 class CustomCommandClass(click.Command):
-    def invoke(self, ctx):
-        config_file = ctx.params["config_file"]
+    def invoke(self, context):
+        self.load_config(context)
+        self.validate_params(context)
+
+        return super(CustomCommandClass, self).invoke(context)
+
+    def load_config(self, context):
+        config_file = context.params["config_file"]
 
         if config_file is not None and os.path.exists(config_file):
             with open(config_file) as f:
-                config_data = yaml.load(f)
-                for param, value in ctx.params.items():
-                    if value is None and param in config_data:
-                        ctx.params[param] = config_data[param]
+                config_data = yaml.safe_load(f)
+                self.merge_configs(context, config_data)
 
-        return super(CustomCommandClass, self).invoke(ctx)
+    def merge_configs(self, context, config_data):
+        for param, value in context.params.items():
+            if value is None and param in config_data:
+                context.params[param] = config_data[param]
+
+    def validate_params(self, context):
+        if context.params["port"] is None:
+            context.params["port"] = 9999
+        if context.params["host"] is None:
+            context.params["host"] = "127.0.0.1"
+
+        if context.params["username"] is None:
+            raise click.BadParameter(
+                "SiriusXM Username is required",
+                ctx=context,
+                param=context.params.get("username"),
+            )
+        elif context.params["password"] is None:
+            raise click.BadParameter(
+                "SiriusXM Password is required",
+                ctx=context,
+                param=context.params.get("password"),
+            )
+        # elif context.params["token"] is None:
+        #     raise click.BadParameter(
+        #         "Discord Token is required",
+        #         ctx=context,
+        #         param=context.params.get("token"),
+        #     )
 
 
 def init_db(
@@ -111,28 +144,19 @@ def splice_file(
 ) -> Union[str, None]:
     """ Splices a chunk off of the input file and saves it """
 
-    args = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        input_file,
-        "-acodec",
-        "copy",
-        "-ss",
-        str(start_time),
-        "-to",
-        str(end_time),
-        "-loglevel",
-        "fatal",
-        output_file,
-    ]
+    ffmpeg_command = (
+        'ffmpeg -y -i "{}" -acodec copy -ss {} -to {} -loglevel fatal "{}"'
+    )
+    args = shlex.split(
+        ffmpeg_command.format(input_file, start_time, end_time, output_file)
+    )
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
     try:
-        subprocess.run(args, check=True)
+        subprocess.run(args, check=True)  # nosec
     except subprocess.CalledProcessError as e:
-        logger.error(f"failed to create archive: {e}")
+        logger.error(f"failed to split file: {e}")
         return None
     else:
         logger.info(f"spliced file: {output_file}")

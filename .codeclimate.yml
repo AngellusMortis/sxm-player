@@ -1,0 +1,40 @@
+version: 2
+checks:
+  # click + MP makes this hard
+  argument-count:
+    enabled: false
+  # already done by radon
+  method-complexity:
+    enabled: false
+plugins:
+  bandit:
+    enabled: true
+  duplication:
+    enabled: true
+  fixme:
+    enabled: true
+  git-legal:
+    enabled: true
+  pep8:
+    enabled: true
+  radon:
+    enabled: true
+    config:
+      threshold: "C"
+  sonar-python:
+    enabled: true
+exclude_patterns:
+  - "versioneer.py"
+  - "**/_version.py"
+  - "config"
+  - "db"
+  - "dist"
+  - "docs"
+  - "features"
+  - "**/node_modules"
+  - "script"
+  - "**/spec"
+  - "**/test"
+  - "**/tests"
+  - "**/vendor"
+  - "**/*.d.ts"

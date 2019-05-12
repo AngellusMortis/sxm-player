@@ -4,17 +4,20 @@ from typing import Callable
 
 from sxm import SiriusXMClient, make_http_handler
 
-from .base import BaseRunner
+from .base import InterruptableWorker
+from ..queue import EventMessage
+from ..signals import TerminateInterrupt
 
-__all__ = ["ServerRunner"]
+__all__ = ["ServerWorker"]
 
 
-class ServerRunner(BaseRunner):
+class ServerWorker(InterruptableWorker):
     """ SiriusXMProxy Server for Discord bot to interface with """
+
+    NAME = "sxm"
 
     _ip: str
     _port: int
-    _request_log_level: int
     sxm: SiriusXMClient
 
     def __init__(
@@ -27,7 +30,6 @@ class ServerRunner(BaseRunner):
         *args,
         **kwargs,
     ):
-        kwargs["name"] = "server"
         super().__init__(*args, **kwargs)
 
         self._port = port
@@ -41,24 +43,33 @@ class ServerRunner(BaseRunner):
         )
 
         self.sxm.authenticate()
-        self.state.channels = self.sxm.get_channels()
 
     def _make_update_handler(self) -> Callable[[dict], None]:
         """ Returns update handler to be called by
         `SiriusXMClient.get_playlist` when a HLS playlist updates """
 
         def update_handler(data: dict) -> None:
-            self._log.debug(f"received update data for: {data['channelId']}")
-            if self.state.active_channel_id == data["channelId"]:
-                self._log.info(
-                    f"{self.state.active_channel_id}: updating channel data"
+            self.push_event(
+                EventMessage(
+                    self.name, EventMessage.UPDATE_METADATA_EVENT, data
                 )
-                self.state.live = data
+            )
 
         return update_handler
 
+    def send_channel_list(self):
+        channels = self.sxm.get_channels()
+
+        self.push_event(
+            EventMessage(
+                self.name, EventMessage.UPDATE_CHANNELS_EVENT, channels
+            )
+        )
+
     def run(self) -> None:
         """ Runs SiriusXM proxy server """
+
+        self.send_channel_list()
 
         request_logger = logging.getLogger("mortis_music.server.request")
 
@@ -70,9 +81,10 @@ class ServerRunner(BaseRunner):
         )
         try:
             self._log.info(
-                f"server runner has started on http://{self._ip}:{self._port}"
+                f"{self.name} has started on http://{self._ip}:{self._port}"
             )
             httpd.serve_forever()
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, TerminateInterrupt):
             pass
+
         httpd.server_close()

@@ -1,3 +1,4 @@
+*.mp3
 .env.yml
 
 # Byte-compiled / optimized / DLL files

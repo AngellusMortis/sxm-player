@@ -1,46 +1,59 @@
 import os
 from typing import Dict
+import time
 
 from sxm.models import XMMarker
 
 from ..models import Episode, Song
 from ..utils import get_air_time, get_files, splice_file
 from .archiver import ARCHIVE_CHUNK
-from .base import BaseRunner
+from .base import HLSLoopedWorker
 
-__all__ = ["ProcessorRunner"]
+__all__ = ["ProcessorWorker"]
 
 MAX_DUPLICATE_COUNT = 3
 
 
-class ProcessorRunner(BaseRunner):
+class ProcessorWorker(HLSLoopedWorker):
     """ Runs song/show processor """
 
-    def __init__(self, reset_songs: bool, *args, **kwargs):
-        kwargs["name"] = "processor"
-        kwargs["reset_songs"] = reset_songs
+    NAME = "processor"
+
+    _delay: float = ARCHIVE_CHUNK
+
+    def __init__(
+        self,
+        processed_folder: str,
+        archive_folder: str,
+        reset_songs: bool,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
 
-        self._delay = 10
-        if (
-            self.state.processed_folder is not None
-            and self.state.archive_folder is not None
-        ):
-            os.makedirs(self.state.processed_folder, exist_ok=True)
-            os.makedirs(self.state.archive_folder, exist_ok=True)
+        self.processed_folder = processed_folder
+        self.archive_folder = archive_folder
+
+        # run in 90 seconds and run ~30 seconds after Archiver
+        self._last_loop = time.time() + 90 - ARCHIVE_CHUNK
+        self._state.processed_folder = self.processed_folder
+        self._state.db_reset = reset_songs
+
+        os.makedirs(self.processed_folder, exist_ok=True)
+        os.makedirs(self.archive_folder, exist_ok=True)
 
     def loop(self) -> None:
         self._delay = ARCHIVE_CHUNK
 
         if (
-            self.state.active_channel_id is None
-            or self.state.live is None
-            or self.state.archive_folder is None
+            self._state.stream_channel is None
+            or self._state.live is None
+            or self.archive_folder is None
         ):
             return None
 
         channel_archive = os.path.join(
-            self.state.archive_folder, self.state.active_channel_id
+            self.archive_folder, self._state.stream_channel
         )
         os.makedirs(channel_archive, exist_ok=True)
 
@@ -70,6 +83,9 @@ class ProcessorRunner(BaseRunner):
             .replace("Trust?", "Trust")
             .replace("P.O.D.", "POD")
             .replace("//", "-")
+            .replace("@", "")
+            .replace("(", "")
+            .replace(")", "")
             .strip()
         )
 
@@ -80,9 +96,9 @@ class ProcessorRunner(BaseRunner):
             instance of `XMMarker` if it exists """
 
         if (
-            self.state.processed_folder is None
-            or self.state.active_channel_id is None
-            or self.state.db is None
+            self.processed_folder is None
+            or self._state.stream_channel is None
+            or self._state.db is None
         ):
             return False
 
@@ -110,7 +126,7 @@ class ProcessorRunner(BaseRunner):
             artist = None
             filename = None
             folder = os.path.join(
-                self.state.processed_folder, self.state.active_channel_id
+                self.processed_folder, self._state.stream_channel
             )
 
             air_time = get_air_time(cut)
@@ -169,7 +185,7 @@ class ProcessorRunner(BaseRunner):
                         artist=artist,
                         album=album_or_show,
                         air_time=air_time,
-                        channel=self.state.active_channel_id,
+                        channel=self._state.stream_channel,
                         file_path=path,
                     )
                 else:
@@ -178,12 +194,12 @@ class ProcessorRunner(BaseRunner):
                         title=title,
                         show=album_or_show,
                         air_time=air_time,
-                        channel=self.state.active_channel_id,
+                        channel=self._state.stream_channel,
                         file_path=path,
                     )
 
-                self.state.db.add(db_item)
-                self.state.db.commit()
+                self._state.db.add(db_item)
+                self._state.db.commit()
                 self._log.debug(f"inserted cut {is_song}: {db_item.guid}")
                 return True
         return False
@@ -194,13 +210,13 @@ class ProcessorRunner(BaseRunner):
         """ Processes `archives` to splice out any
             instance of `XMMarker` if it exists """
 
-        if self.state.live is None or self.state.db is None:
+        if self._state.live is None or self._state.db is None:
             return 0
 
         if is_song:
-            cuts = self.state.live.song_cuts
+            cuts = self._state.live.song_cuts
         else:
-            cuts = self.state.live.episode_markers
+            cuts = self._state.live.episode_markers
 
         processed = 0
         for cut in cuts:
@@ -210,7 +226,7 @@ class ProcessorRunner(BaseRunner):
             db_item = None
             if is_song:
                 existing = (
-                    self.state.db.query(Song)
+                    self._state.db.query(Song)
                     .filter_by(
                         title=cut.cut.title, artist=cut.cut.artists[0].name
                     )
@@ -221,11 +237,11 @@ class ProcessorRunner(BaseRunner):
                     continue
 
                 db_item = (
-                    self.state.db.query(Song).filter_by(guid=cut.guid).first()
+                    self._state.db.query(Song).filter_by(guid=cut.guid).first()
                 )
             else:
                 db_item = (
-                    self.state.db.query(Episode)
+                    self._state.db.query(Episode)
                     .filter_by(guid=cut.guid)
                     .first()
                 )
