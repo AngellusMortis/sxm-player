@@ -38,3 +38,5 @@ exclude_patterns:
   - "**/tests"
   - "**/vendor"
   - "**/*.d.ts"
+  - "**/.eggs"
+  - "**/.mypy_cache"

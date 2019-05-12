@@ -1,0 +1,10 @@
+{
+    "python.pythonPath": "~/.virtualenvs/${workspaceFolderBasename}/bin/python",
+    "restructuredtext.confPath": "${workspaceFolder}/docs",
+    "python.linting.banditEnabled": true,
+    "python.formatting.provider": "black",
+    "python.linting.flake8Enabled": true,
+    "python.linting.mypyEnabled": true,
+    "python.linting.pylamaEnabled": true,
+    "editor.formatOnSave": true,
+}
