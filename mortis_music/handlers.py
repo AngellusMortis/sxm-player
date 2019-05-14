@@ -25,6 +25,10 @@ def hls_metadata_event(runner: Runner, live_data: tuple):
     hls_event(runner, EventMessage.UPDATE_METADATA_EVENT, live_data)
 
 
+def hls_channels_event(runner: Runner, channels: Optional[list]):
+    hls_event(runner, EventMessage.UPDATE_CHANNELS_EVENT, channels)
+
+
 def hls_event(runner: Runner, event: str, data):
     for worker in runner.workers.values():
         if worker.hls_stream_queue is not None:
@@ -57,8 +61,12 @@ def push_event(
         runner.log.error(f"Could not pass status event to {worker.name}")
 
 
-def handle_channels_event(event: EventMessage, sxm_state: XMState, **kwargs):
+def handle_channels_event(
+    event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
+):
     sxm_state.channels = event.msg
+
+    hls_channels_event(runner, sxm_state.get_raw_channels())
 
 
 def handle_reset_sxm_event(
@@ -122,7 +130,7 @@ def handle_trigger_hls_event(
         runner.create_worker(
             HLSWorker,
             HLSWorker.NAME,
-            base_url=f"http://{host}:{port}",
+            ip=host,
             port=port,
             channel_id=event.msg[0],
             stream_folder=stream_folder,
@@ -179,6 +187,7 @@ def handle_hls_stream_event(
             stream_folder=stream_folder,
             archive_folder=archive_folder,
             stream_data=sxm_state.stream_data,
+            channels=sxm_state.get_raw_channels(),
             raw_live_data=sxm_state.get_raw_live(),
         )
 
@@ -189,6 +198,7 @@ def handle_hls_stream_event(
             archive_folder=archive_folder,
             reset_songs=reset_songs,
             stream_data=sxm_state.stream_data,
+            channels=sxm_state.get_raw_channels(),
             raw_live_data=sxm_state.get_raw_live(),
         )
 
@@ -200,6 +210,20 @@ def handle_metadata_event(
     sxm_state.stream_channel = event.msg["channelId"]
     sxm_state.live = event.msg
     hls_metadata_event(runner, sxm_state.get_raw_live())
+
+
+def handle_hls_stderr_event(
+    event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
+):
+    do_reset = False
+    for line in event.msg:
+        runner.log.debug(f"ffmpeg STDERR: {line}")
+
+        if "503" in line:
+            do_reset = True
+
+    if do_reset:
+        handle_reset_sxm_event(event, runner, sxm_state)
 
 
 if DebugHLSPlayer is not None:
@@ -225,9 +249,10 @@ if DebugHLSPlayer is not None:
             runner.create_worker(
                 DebugHLSPlayer,
                 player_name,
-                stream_data=(channel_id, sxm_state.stream_url),
                 filename=filename,
                 stream_protocol=stream_protocol,
+                stream_data=(channel_id, sxm_state.stream_url),
+                channels=sxm_state.get_raw_channels(),
                 raw_live_data=sxm_state.get_raw_live(),
             )
 

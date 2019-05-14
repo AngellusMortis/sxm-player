@@ -114,7 +114,7 @@ class Worker:
         if not started:
             self.terminate()
             raise RuntimeError(
-                f"Process {name} failed to startup after {timeout} " "seconds"
+                f"Process {name} failed to startup after {timeout} seconds"
             )
 
     def full_stop(self, wait_time=STOP_WAIT_SECS):

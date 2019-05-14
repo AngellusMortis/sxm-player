@@ -2,6 +2,10 @@ import logging
 from multiprocessing import Event
 from typing import Tuple, Optional, List
 import time
+import select
+import subprocess  # nosec
+import shlex
+import psutil
 
 from ..signals import (
     default_signal_handler,
@@ -84,12 +88,18 @@ class LoopedWorker(BaseWorker):
     _delay: float = 1
 
     def run(self):
+        self.setup()
+
         while not self.shutdown_event.is_set():
             time.sleep(self._delay)
             self.loop()
+
         self.cleanup()
 
     def cleanup(self):
+        pass
+
+    def setup(self):
         pass
 
     def loop(self):
@@ -116,22 +126,30 @@ class EventedWorker(LoopedWorker):
     _event_delay: float = 0
 
     def run(self):
-        while (
-            not self.shutdown_event.is_set()
-            and not self.local_shutdown_event.is_set()
-        ):
-            for queue in self._event_queues:
-                event = queue.safe_get()
+        self.setup()
 
-                if event:
-                    self._log.debug(
-                        f"Received event: {event.msg_src}, {event.msg_type}"
-                    )
-                    self._handle_event(event)
+        try:
+            while (
+                not self.shutdown_event.is_set()
+                and not self.local_shutdown_event.is_set()
+            ):
+                for queue in self._event_queues:
+                    event = queue.safe_get()
 
-            if time.time() > (self._last_loop + self._delay):
-                self.loop()
-                self._last_loop = time.time()
+                    if event:
+                        self._log.debug(
+                            f"Received event: {event.msg_src}, "
+                            f"{event.msg_type}"
+                        )
+                        self._handle_event(event)
+
+                if time.time() > (self._last_loop + self._delay):
+                    self.loop()
+                    self._last_loop = time.time()
+        except Exception as e:
+            self._log.error(f"Exception occurred in {self.name}: {e}")
+
+        self.cleanup()
 
     def _handle_event(self, event: EventMessage):
         raise NotImplementedError("_handle_event method not implemented")
@@ -163,8 +181,11 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
 
     def __init__(
         self,
-        stream_data: Tuple[Optional[str], Optional[str]],
-        raw_live_data: Tuple[Optional[float], Optional[float], Optional[dict]],
+        stream_data: Tuple[Optional[str], Optional[str]] = (None, None),
+        channels: Optional[List[dict]] = None,
+        raw_live_data: Tuple[
+            Optional[float], Optional[float], Optional[dict]
+        ] = (None, None, None),
         *args,
         **kwargs,
     ):
@@ -176,6 +197,7 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
 
         self._state = XMState()
         self._state.stream_data = stream_data
+        self._state.channels = channels  # type: ignore
         self._state.set_raw_live(raw_live_data)
 
     def _handle_event(self, event: EventMessage):
@@ -183,6 +205,8 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
             self._state.stream_data = event.msg
         elif event.msg_type == EventMessage.UPDATE_METADATA_EVENT:
             self._state.set_raw_live(event.msg)
+        elif event.msg_type == EventMessage.UPDATE_CHANNELS_EVENT:
+            self._state.channels = event.msg
         elif event.msg_type == EventMessage.KILL_HLS_STREAM:
             self.local_shutdown_event.set()  # type: ignore
         else:
@@ -216,3 +240,57 @@ class ComboLoopedWorker(
         self._state = XMState()
         self._state.stream_data = stream_data
         self._state.set_raw_live(raw_live_data)
+
+
+class FFmpegPlayer:
+    ACTIVE_STATUS = [
+        psutil.STATUS_RUNNING,
+        psutil.STATUS_SLEEPING,
+        psutil.STATUS_DISK_SLEEP,
+    ]
+
+    command: str
+    process: Optional[subprocess.Popen] = None
+
+    _stderr_poll: Optional[select.poll] = None  # pylint: disable=E1101
+
+    def start_ffmpeg(self) -> None:
+        ffmpeg_args = shlex.split(self.command)
+
+        self.process = subprocess.Popen(  # nosec
+            ffmpeg_args, stderr=subprocess.PIPE
+        )
+
+        self._stderr_poll = select.poll()  # pylint: disable=E1101
+        self._stderr_poll.register(
+            self.process.stderr, select.POLLIN  # pylint: disable=E1101 # noqa
+        )
+
+    def check_process(self) -> bool:
+        if self.process is None:
+            return False
+
+        process = psutil.Process(self.process.pid)
+        status = process.status()
+
+        return status in FFmpegPlayer.ACTIVE_STATUS
+
+    def stop_ffmpeg(self) -> None:
+        if self.process is None:
+            return
+
+        self.process.kill()
+        if self.process.poll() is None:
+            self.process.communicate()
+
+        self.process = None
+
+    def read_errors(self) -> List[str]:
+        if self.process is None or self._stderr_poll is None:
+            return []
+
+        lines: List[str] = []
+        while self._stderr_poll.poll(0.1):
+            lines.append(self.process.stderr.readline().decode("utf8"))
+
+        return lines

@@ -5,13 +5,12 @@
 
 from setuptools import find_packages, setup
 
-# for pip >= 10
-try:
-    from pip._internal.req import parse_requirements
-# for pip <= 9.0.3
-except ImportError:
-    from pip.req import parse_requirements
-from setuptools import find_packages, setup
+
+def parse_requirements(filename):
+    """ load requirements from a pip requirements file """
+    lines = (line.strip() for line in open(filename))
+    return [line for line in lines if line and not line.startswith("#")]
+
 
 with open("README.rst") as readme_file:
     readme = readme_file.read()
@@ -27,12 +26,8 @@ req_files = {
 
 requirements = {}
 for req, req_file in req_files.items():
-    reqs = parse_requirements(req_file, session="fake")
-    requirements[req] = [str(req.req) for req in reqs]
+    requirements[req] = parse_requirements(req_file)
 
-setup_requirements = ["pytest-runner"]
-
-test_requirements = ["pytest"]
 
 setup(
     author="Christopher Bailey",
