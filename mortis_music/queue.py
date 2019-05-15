@@ -10,8 +10,7 @@ DEFAULT_POLLING_TIMEOUT = 0.02
 
 class Event(Enum):
     RESET_SXM = auto()
-    SXM_RUNNING = auto()
-    SXM_STOPPED = auto()
+    SXM_STATUS = auto()
     UPDATE_CHANNELS = auto()
     UPDATE_METADATA = auto()
     HLS_STREAM_STARTED = auto()

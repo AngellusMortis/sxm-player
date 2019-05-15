@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 
-from .models import XMState
+from .models import PlayerState
 from .queue import Event, EventMessage
 from .runner import Runner, Worker
 from .workers import (
@@ -40,14 +40,14 @@ def hls_event(runner: Runner, event: Event, data):
             )
 
 
-def sxm_status_event(runner: Runner, event: Event):
+def sxm_status_event(runner: Runner, event: Event, status: bool):
     for worker in runner.workers.values():
         if worker.sxm_status_queue is not None:
             push_event(
                 runner,
                 worker,
                 "sxm_status_queue",
-                EventMessage("main", event, None),
+                EventMessage("main", event, status),
             )
 
 
@@ -62,22 +62,22 @@ def push_event(
 
 
 def handle_update_channels_event(
-    event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
+    event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
-    sxm_state.channels = event.msg
+    state.channels = event.msg
 
-    hls_channels_event(runner, sxm_state.get_raw_channels())
+    hls_channels_event(runner, state.get_raw_channels())
 
 
 def handle_reset_sxm_event(
-    event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
+    event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
 
     sxm_worker = runner.workers.get(ServerWorker.NAME)
     if sxm_worker is not None:
         sxm_worker.terminate()
-        sxm_state.channels = None  # type: ignore
-        cooldown = sxm_state.increase_cooldown()
+        state.channels = None  # type: ignore
+        cooldown = state.increase_cooldown()
 
         runner.log.warning(
             "SiriusXM Client acting up, restarting it (cooldown: "
@@ -85,13 +85,15 @@ def handle_reset_sxm_event(
         )
 
         del runner.workers[ServerWorker.NAME]
-        sxm_status_event(runner, Event.SXM_STOPPED)
+
+        state.sxm_running = False
+        sxm_status_event(runner, Event.SXM_STATUS, state.sxm_running)
 
 
 def handle_trigger_hls_stream_event(
     event: EventMessage,
     runner: Runner,
-    sxm_state: XMState,
+    state: PlayerState,
     host: str,
     port: int,
     output_folder: str,
@@ -111,7 +113,7 @@ def handle_trigger_hls_stream_event(
                 src_worker,
                 "hls_stream_queue",
                 EventMessage(
-                    "main", Event.HLS_STREAM_STARTED, sxm_state.stream_data
+                    "main", Event.HLS_STREAM_STARTED, state.stream_data
                 ),
             )
             runner.log.info(
@@ -124,7 +126,7 @@ def handle_trigger_hls_stream_event(
                 f"Could not start new {HLSWorker.NAME}, one is "
                 "already running and no request was not HLSPlayer"
             )
-    elif sxm_state.get_channel(event.msg[0]) is not None:
+    elif state.get_channel(event.msg[0]) is not None:
         runner.create_worker(
             HLSWorker,
             HLSWorker.NAME,
@@ -133,8 +135,9 @@ def handle_trigger_hls_stream_event(
             channel_id=event.msg[0],
             stream_folder=stream_folder,
             stream_protocol=event.msg[1],
+            sxm_status=state.sxm_running,
         )
-        sxm_state.stream_channel = event.msg
+        state.stream_channel = event.msg
     else:
         runner.log.warning(
             f"Could not start new {HLSWorker.NAME}, invalid "
@@ -143,10 +146,10 @@ def handle_trigger_hls_stream_event(
 
 
 def handle_kill_hls_stream_event(
-    event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
+    event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
 
-    sxm_state.stream_data = (None, None)
+    state.stream_data = (None, None)
 
     hls_worker = runner.workers.get(HLSWorker.NAME)
     hls_kill_event(runner)
@@ -161,7 +164,7 @@ def handle_kill_hls_stream_event(
 def handle_hls_stream_started_event(
     event: EventMessage,
     runner: Runner,
-    sxm_state: XMState,
+    state: PlayerState,
     output_folder: str,
     reset_songs: bool,
     **kwargs,
@@ -175,8 +178,8 @@ def handle_hls_stream_started_event(
         archive_folder = os.path.join(output_folder, "archive")
         processed_folder = os.path.join(output_folder, "processed")
 
-    sxm_state.stream_data = event.msg
-    hls_start_event(runner, sxm_state.stream_data)
+    state.stream_data = event.msg
+    hls_start_event(runner, state.stream_data)
 
     if output_folder is not None:
         runner.create_worker(
@@ -184,9 +187,9 @@ def handle_hls_stream_started_event(
             ArchiveWorker.NAME,
             stream_folder=stream_folder,
             archive_folder=archive_folder,
-            stream_data=sxm_state.stream_data,
-            channels=sxm_state.get_raw_channels(),
-            raw_live_data=sxm_state.get_raw_live(),
+            stream_data=state.stream_data,
+            channels=state.get_raw_channels(),
+            raw_live_data=state.get_raw_live(),
         )
 
         runner.create_worker(
@@ -195,23 +198,23 @@ def handle_hls_stream_started_event(
             processed_folder=processed_folder,
             archive_folder=archive_folder,
             reset_songs=reset_songs,
-            stream_data=sxm_state.stream_data,
-            channels=sxm_state.get_raw_channels(),
-            raw_live_data=sxm_state.get_raw_live(),
+            stream_data=state.stream_data,
+            channels=state.get_raw_channels(),
+            raw_live_data=state.get_raw_live(),
         )
 
 
 def handle_update_metadata_event(
-    event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
+    event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
 
-    sxm_state.stream_channel = event.msg["channelId"]
-    sxm_state.live = event.msg
-    hls_metadata_event(runner, sxm_state.get_raw_live())
+    state.stream_channel = event.msg["channelId"]
+    state.live = event.msg
+    hls_metadata_event(runner, state.get_raw_live())
 
 
 def handle_hls_stderror_lines_event(
-    event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
+    event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
     do_reset = False
     for line in event.msg:
@@ -221,13 +224,13 @@ def handle_hls_stderror_lines_event(
             do_reset = True
 
     if do_reset:
-        handle_reset_sxm_event(event, runner, sxm_state)
+        handle_reset_sxm_event(event, runner, state)
 
 
 if DebugHLSPlayer is not None:
 
     def handle_debug_start_player_event(
-        event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
+        event: EventMessage, runner: Runner, state: PlayerState, **kwargs
     ):
 
         player_name = event.msg[0]
@@ -236,12 +239,12 @@ if DebugHLSPlayer is not None:
         stream_protocol = event.msg[3]
 
         if (
-            sxm_state.stream_channel is not None
-            and channel_id not in sxm_state.stream_channel
+            state.stream_channel is not None
+            and channel_id not in state.stream_channel
         ):
             runner.log.warning(
                 "Cannot start player, different HLS stream "
-                f"playing: {sxm_state.stream_url}"
+                f"playing: {state.stream_url}"
             )
         else:
             runner.create_worker(
@@ -249,9 +252,10 @@ if DebugHLSPlayer is not None:
                 player_name,
                 filename=filename,
                 stream_protocol=stream_protocol,
-                stream_data=(channel_id, sxm_state.stream_url),
-                channels=sxm_state.get_raw_channels(),
-                raw_live_data=sxm_state.get_raw_live(),
+                sxm_status=state.sxm_running,
+                stream_data=(channel_id, state.stream_url),
+                channels=state.get_raw_channels(),
+                raw_live_data=state.get_raw_live(),
             )
 
     def handle_debug_stop_player_event(

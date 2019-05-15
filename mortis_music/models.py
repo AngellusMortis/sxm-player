@@ -83,7 +83,7 @@ class Episode(Base):  # type: ignore
         )
 
 
-class XMState:
+class PlayerState:
     COOLDOWN_SHORT = 30
     COOLDOWN_MED = 300
     COOLDOWN_LONG = 3600
@@ -92,6 +92,7 @@ class XMState:
     stream_channel: Optional[str] = None
     processed_folder: Optional[str] = None
     db_reset: bool = False
+    sxm_running: bool = False
 
     _db: Optional[Session] = None
     _raw_channels: Optional[List[dict]] = None
@@ -217,11 +218,11 @@ class XMState:
     def increase_cooldown(self) -> float:
         extra_seconds = 0
         if self._failures < 3:
-            extra_seconds = XMState.COOLDOWN_SHORT
+            extra_seconds = PlayerState.COOLDOWN_SHORT
         elif self._failures < 5:
-            extra_seconds = XMState.COOLDOWN_MED
+            extra_seconds = PlayerState.COOLDOWN_MED
         else:
-            extra_seconds = XMState.COOLDOWN_LONG
+            extra_seconds = PlayerState.COOLDOWN_LONG
 
         self._cooldown = time.time() + extra_seconds
 

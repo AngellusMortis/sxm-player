@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple
 
 import psutil
 
-from ..models import XMState
+from ..models import PlayerState
 from ..queue import Event, EventMessage, Queue
 from ..signals import (
     default_signal_handler,
@@ -157,20 +157,20 @@ class EventedWorker(LoopedWorker):
 
 
 class SXMLoopedWorker(EventedWorker, SXMStatusSubscriber):
-    _sxm_running: bool = False
+    _state: PlayerState
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, sxm_status: bool, *args, **kwargs):
         sxm_status_queue = kwargs.pop("sxm_status_queue")
         SXMStatusSubscriber.__init__(self, sxm_status_queue)
         super().__init__(*args, **kwargs)
 
+        self._state = PlayerState()
+        self._state.sxm_running = sxm_status
         self._event_queues = [self.sxm_status_queue]
 
     def _handle_event(self, event: EventMessage):
-        if event.msg_type == Event.SXM_RUNNING:
-            self._sxm_running = True
-        elif event.msg_type == Event.SXM_STOPPED:
-            self._sxm_running = False
+        if event.msg_type == Event.SXM_STATUS:
+            self._state.sxm_running = event.msg
         else:
             self._log.warning(
                 f"Unknown event received: {event.msg_src}, {event.msg_type}"
@@ -178,7 +178,7 @@ class SXMLoopedWorker(EventedWorker, SXMStatusSubscriber):
 
 
 class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
-    _state: XMState
+    _state: PlayerState
 
     def __init__(
         self,
@@ -196,7 +196,7 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
 
         self._event_queues = [self.hls_stream_queue]
 
-        self._state = XMState()
+        self._state = PlayerState()
         self._state.stream_data = stream_data
         self._state.channels = channels  # type: ignore
         self._state.set_raw_live(raw_live_data)
@@ -219,11 +219,11 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
 class ComboLoopedWorker(
     EventedWorker, SXMStatusSubscriber, HLSStatusSubscriber
 ):
-    _sxm_running: bool = False
-    _state: XMState
+    _state: PlayerState
 
     def __init__(
         self,
+        sxm_status: bool,
         stream_data: Tuple[Optional[str], Optional[str]],
         raw_live_data: Tuple[Optional[float], Optional[float], Optional[dict]],
         *args,
@@ -238,7 +238,8 @@ class ComboLoopedWorker(
 
         self._event_queues = [self.hls_stream_queue, self.sxm_status_queue]
 
-        self._state = XMState()
+        self._state = PlayerState()
+        self._state.sxm_running = sxm_status
         self._state.stream_data = stream_data
         self._state.set_raw_live(raw_live_data)
 

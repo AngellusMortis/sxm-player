@@ -29,7 +29,7 @@ class StatusWorker(SXMLoopedWorker):
         self.check_sxm()
 
     def check_sxm(self):
-        if self._sxm_running:
+        if self._state.sxm_running:
             self._log.debug("Checking SiriusXM Client")
             r = requests.get(f"http://{self._ip}:{self._port}/channels/")
 

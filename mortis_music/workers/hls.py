@@ -41,8 +41,6 @@ class HLSWorker(SXMLoopedWorker, FFmpegPlayer):
     ):
         super().__init__(*args, **kwargs)
 
-        self._sxm_running = True
-
         self.stream_url = f"http://{ip}:{port}/{channel_id}.m3u8"
         self.channel_id = channel_id
 
@@ -113,7 +111,7 @@ class HLSWorker(SXMLoopedWorker, FFmpegPlayer):
     def loop(self):
         now = time.time()
 
-        if not self._sxm_running:
+        if not self._state.sxm_running:
             self._log.info(f"SiriusXM Client is dead, stopping {self.name}")
             self.local_shutdown_event.set()
             return

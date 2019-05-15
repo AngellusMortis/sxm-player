@@ -8,7 +8,7 @@ from typing import Optional
 import click
 
 from . import handlers
-from .models import XMState
+from .models import PlayerState
 from .queue import Event, EventMessage
 from .runner import Runner
 from .utils import CustomCommandClass
@@ -89,10 +89,14 @@ def main(
         if debug and DebugWorker is not None:
             runner.create_worker(DebugWorker, DebugWorker.NAME)
 
-        sxm_state = XMState()
+        state = PlayerState()
 
         runner.create_worker(
-            StatusWorker, StatusWorker.NAME, port=port, ip=host
+            StatusWorker,
+            StatusWorker.NAME,
+            port=port,
+            ip=host,
+            sxm_status=state.sxm_running,
         )
 
         while not runner.shutdown_event.is_set():  # type: ignore
@@ -121,9 +125,9 @@ def spawn_sxm_worker(
     )
 
 
-def event_loop(runner: Runner, sxm_state: XMState, **kwargs):
-    if not sxm_state.is_connected:
-        if sxm_state.mark_attempt(runner.log):
+def event_loop(runner: Runner, state: PlayerState, **kwargs):
+    if not state.is_connected:
+        if state.mark_attempt(runner.log):
             spawn_sxm_worker(runner, **kwargs)
 
     event = runner.event_queue.safe_get()
@@ -135,18 +139,20 @@ def event_loop(runner: Runner, sxm_state: XMState, **kwargs):
 
     was_connected: Optional[bool] = None
     if event.msg_src == ServerWorker.NAME:
-        was_connected = sxm_state.is_connected
+        was_connected = state.is_connected
 
-    handle_event(event=event, runner=runner, sxm_state=sxm_state, **kwargs)
+    handle_event(event=event, runner=runner, state=state, **kwargs)
 
-    if was_connected is False and sxm_state.is_connected:
-        if not was_connected and sxm_state.is_connected:
+    if was_connected is False and state.is_connected:
+        if not was_connected and state.is_connected:
             runner.log.info(
-                "SiriusXM Client started. "
-                f"{len(sxm_state.channels)} available"
+                "SiriusXM Client started. " f"{len(state.channels)} available"
             )
 
-            handlers.sxm_status_event(runner, Event.SXM_RUNNING)
+            state.sxm_running = True
+            handlers.sxm_status_event(
+                runner, Event.SXM_STATUS, state.sxm_running
+            )
 
 
 def handle_event(event: EventMessage, **kwargs):

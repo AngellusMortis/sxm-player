@@ -69,7 +69,6 @@ class DebugHLSPlayer(ComboLoopedWorker, FFmpegPlayer):
     ):
         super().__init__(*args, **kwargs)
 
-        self._sxm_running = True
         self.channel_id = self._state.stream_channel
         self.stream_protocol = stream_protocol
         self.filename = filename
@@ -78,7 +77,7 @@ class DebugHLSPlayer(ComboLoopedWorker, FFmpegPlayer):
             raise RuntimeError("No channel_id or stream_url provided")
 
     def loop(self):
-        if self._sxm_running and self._state.stream_url is not None:
+        if self._state.sxm_running and self._state.stream_url is not None:
             self._valid_stream_loop()
         else:
             self._invalid_stream_loop()
@@ -107,7 +106,7 @@ class DebugHLSPlayer(ComboLoopedWorker, FFmpegPlayer):
 
     def _invalid_stream_loop(self):
         if self.process is None:
-            if self._sxm_running and self._state.stream_url is None:
+            if self._state.sxm_running and self._state.stream_url is None:
                 now = time.time()
                 if now > self._event_cooldown:
                     self._event_cooldown = now + 10
@@ -130,10 +129,8 @@ class DebugHLSPlayer(ComboLoopedWorker, FFmpegPlayer):
         self._state.stream_data = (None, None)
 
     def _handle_event(self, event: EventMessage):
-        if event.msg_type == Event.SXM_RUNNING:
-            self._sxm_running = True
-        elif event.msg_type == Event.SXM_STOPPED:
-            self._sxm_running = False
+        if event.msg_type == Event.SXM_STATUS:
+            self._state.sxm_running = event.msg
         elif event.msg_type == Event.HLS_STREAM_STARTED:
             self._state.stream_data = event.msg
         elif event.msg_type == Event.UPDATE_METADATA:
