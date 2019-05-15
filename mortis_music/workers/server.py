@@ -4,9 +4,9 @@ from typing import Callable
 
 from sxm import SiriusXMClient, make_http_handler
 
-from .base import InterruptableWorker
-from ..queue import EventMessage
+from ..queue import Event, EventMessage
 from ..signals import TerminateInterrupt
+from .base import InterruptableWorker
 
 __all__ = ["ServerWorker"]
 
@@ -50,9 +50,7 @@ class ServerWorker(InterruptableWorker):
 
         def update_handler(data: dict) -> None:
             self.push_event(
-                EventMessage(
-                    self.name, EventMessage.UPDATE_METADATA_EVENT, data
-                )
+                EventMessage(self.name, Event.UPDATE_METADATA, data)
             )
 
         return update_handler
@@ -61,9 +59,7 @@ class ServerWorker(InterruptableWorker):
         channels = self.sxm.get_channels()
 
         self.push_event(
-            EventMessage(
-                self.name, EventMessage.UPDATE_CHANNELS_EVENT, channels
-            )
+            EventMessage(self.name, Event.UPDATE_CHANNELS, channels)
         )
 
     def run(self) -> None:

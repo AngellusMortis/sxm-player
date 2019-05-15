@@ -2,9 +2,8 @@ import os
 import time
 from typing import Optional
 
-from .base import InterruptableWorker, ComboLoopedWorker, FFmpegPlayer
-
-from ..queue import EventMessage
+from ..queue import Event, EventMessage
+from .base import ComboLoopedWorker, FFmpegPlayer, InterruptableWorker
 
 __all__ = ["DebugWorker", "DebugHLSPlayer"]
 
@@ -35,16 +34,14 @@ class DebugWorker(InterruptableWorker):
         self.push_event(
             EventMessage(
                 self.name,
-                EventMessage.START_DEBUG_PLAYER,
+                Event.DEBUG_START_PLAYER,
                 (player_name, channel_id, filename, protocol),
             )
         )
 
     def stop_player(self, player_name, kill_hls=True):
         self.push_event(
-            EventMessage(
-                self.name, EventMessage.STOP_DEBUG_PLAYER, player_name
-            )
+            EventMessage(self.name, Event.DEBUG_STOP_PLAYER, player_name)
         )
 
         if kill_hls:
@@ -53,16 +50,12 @@ class DebugWorker(InterruptableWorker):
     def trigger_hls(self, channel_id, protocol="udp"):
         self.push_event(
             EventMessage(
-                self.name,
-                EventMessage.TRIGGER_HLS_STREAM,
-                (channel_id, protocol),
+                self.name, Event.TRIGGER_HLS_STREAM, (channel_id, protocol)
             )
         )
 
     def kill_hls(self):
-        self.push_event(
-            EventMessage(self.name, EventMessage.KILL_HLS_STREAM, None)
-        )
+        self.push_event(EventMessage(self.name, Event.KILL_HLS_STREAM, None))
 
 
 class DebugHLSPlayer(ComboLoopedWorker, FFmpegPlayer):
@@ -124,7 +117,7 @@ class DebugHLSPlayer(ComboLoopedWorker, FFmpegPlayer):
                     self.push_event(
                         EventMessage(
                             self.name,
-                            EventMessage.TRIGGER_HLS_STREAM,
+                            Event.TRIGGER_HLS_STREAM,
                             (self.channel_id, self.stream_protocol),
                         )
                     )
@@ -137,17 +130,17 @@ class DebugHLSPlayer(ComboLoopedWorker, FFmpegPlayer):
         self._state.stream_data = (None, None)
 
     def _handle_event(self, event: EventMessage):
-        if event.msg_type == EventMessage.SXM_RUNNING_EVENT:
+        if event.msg_type == Event.SXM_RUNNING:
             self._sxm_running = True
-        elif event.msg_type == EventMessage.SXM_STOPPED_EVENT:
+        elif event.msg_type == Event.SXM_STOPPED:
             self._sxm_running = False
-        elif event.msg_type == EventMessage.HLS_STREAM_STARTED:
+        elif event.msg_type == Event.HLS_STREAM_STARTED:
             self._state.stream_data = event.msg
-        elif event.msg_type == EventMessage.UPDATE_METADATA_EVENT:
+        elif event.msg_type == Event.UPDATE_METADATA:
             self._state.set_raw_live(event.msg)
-        elif event.msg_type == EventMessage.UPDATE_CHANNELS_EVENT:
+        elif event.msg_type == Event.UPDATE_CHANNELS:
             self._state.channels = event.msg
-        elif event.msg_type == EventMessage.KILL_HLS_STREAM:
+        elif event.msg_type == Event.KILL_HLS_STREAM:
             self._log.info(f"stream is stopping, killing ffmpeg")
             self.cleanup()
         else:

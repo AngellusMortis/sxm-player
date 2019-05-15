@@ -2,7 +2,7 @@ import os
 from typing import Optional
 
 from .models import XMState
-from .queue import EventMessage
+from .queue import Event, EventMessage
 from .runner import Runner, Worker
 from .workers import (
     ArchiveWorker,
@@ -14,22 +14,22 @@ from .workers import (
 
 
 def hls_start_event(runner: Runner, stream_data: tuple):
-    hls_event(runner, EventMessage.HLS_STREAM_STARTED, stream_data)
+    hls_event(runner, Event.HLS_STREAM_STARTED, stream_data)
 
 
 def hls_kill_event(runner: Runner):
-    hls_event(runner, EventMessage.KILL_HLS_STREAM, None)
+    hls_event(runner, Event.KILL_HLS_STREAM, None)
 
 
 def hls_metadata_event(runner: Runner, live_data: tuple):
-    hls_event(runner, EventMessage.UPDATE_METADATA_EVENT, live_data)
+    hls_event(runner, Event.UPDATE_METADATA, live_data)
 
 
 def hls_channels_event(runner: Runner, channels: Optional[list]):
-    hls_event(runner, EventMessage.UPDATE_CHANNELS_EVENT, channels)
+    hls_event(runner, Event.UPDATE_CHANNELS, channels)
 
 
-def hls_event(runner: Runner, event: str, data):
+def hls_event(runner: Runner, event: Event, data):
     for worker in runner.workers.values():
         if worker.hls_stream_queue is not None:
             push_event(
@@ -40,7 +40,7 @@ def hls_event(runner: Runner, event: str, data):
             )
 
 
-def sxm_status_event(runner: Runner, event: str):
+def sxm_status_event(runner: Runner, event: Event):
     for worker in runner.workers.values():
         if worker.sxm_status_queue is not None:
             push_event(
@@ -61,7 +61,7 @@ def push_event(
         runner.log.error(f"Could not pass status event to {worker.name}")
 
 
-def handle_channels_event(
+def handle_update_channels_event(
     event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
 ):
     sxm_state.channels = event.msg
@@ -85,10 +85,10 @@ def handle_reset_sxm_event(
         )
 
         del runner.workers[ServerWorker.NAME]
-        sxm_status_event(runner, EventMessage.SXM_STOPPED_EVENT)
+        sxm_status_event(runner, Event.SXM_STOPPED)
 
 
-def handle_trigger_hls_event(
+def handle_trigger_hls_stream_event(
     event: EventMessage,
     runner: Runner,
     sxm_state: XMState,
@@ -111,15 +111,13 @@ def handle_trigger_hls_event(
                 src_worker,
                 "hls_stream_queue",
                 EventMessage(
-                    "main",
-                    EventMessage.HLS_STREAM_STARTED,
-                    sxm_state.stream_data,
+                    "main", Event.HLS_STREAM_STARTED, sxm_state.stream_data
                 ),
             )
             runner.log.info(
                 f"Could not start new {HLSWorker.NAME}, one is "
                 "already running passing "
-                f"{EventMessage.HLS_STREAM_STARTED} instead"
+                f"{Event.HLS_STREAM_STARTED} instead"
             )
         else:
             runner.log.warning(
@@ -160,7 +158,7 @@ def handle_kill_hls_stream_event(
         del runner.workers[HLSWorker.NAME]
 
 
-def handle_hls_stream_event(
+def handle_hls_stream_started_event(
     event: EventMessage,
     runner: Runner,
     sxm_state: XMState,
@@ -203,7 +201,7 @@ def handle_hls_stream_event(
         )
 
 
-def handle_metadata_event(
+def handle_update_metadata_event(
     event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
 ):
 
@@ -212,7 +210,7 @@ def handle_metadata_event(
     hls_metadata_event(runner, sxm_state.get_raw_live())
 
 
-def handle_hls_stderr_event(
+def handle_hls_stderror_lines_event(
     event: EventMessage, runner: Runner, sxm_state: XMState, **kwargs
 ):
     do_reset = False

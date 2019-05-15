@@ -1,19 +1,20 @@
 import logging
-from multiprocessing import Event
-from typing import Tuple, Optional, List
-import time
 import select
-import subprocess  # nosec
 import shlex
+import subprocess  # nosec
+import time
+from multiprocessing import Event as MPEvent
+from typing import List, Optional, Tuple
+
 import psutil
 
+from ..models import XMState
+from ..queue import Event, EventMessage, Queue
 from ..signals import (
     default_signal_handler,
     init_signals,
     interupt_signal_handler,
 )
-from ..models import XMState
-from ..queue import Queue, EventMessage
 
 __all__ = [
     "BaseWorker",
@@ -31,15 +32,15 @@ class BaseWorker:
     name: str = "worker"
     int_handler: staticmethod = staticmethod(default_signal_handler)
     term_handler: staticmethod = staticmethod(default_signal_handler)
-    startup_event: Event  # type: ignore
-    shutdown_event: Event  # type: ignore
-    local_shutdown_event: Event  # type: ignore
+    startup_event: MPEvent  # type: ignore
+    shutdown_event: MPEvent  # type: ignore
+    local_shutdown_event: MPEvent  # type: ignore
 
     def __init__(
         self,
-        startup_event: Event,  # type: ignore
-        shutdown_event: Event,  # type: ignore
-        local_shutdown_event: Event,  # type: ignore
+        startup_event: MPEvent,  # type: ignore
+        shutdown_event: MPEvent,  # type: ignore
+        local_shutdown_event: MPEvent,  # type: ignore
         event_queue: Queue,
         name: str = "worker",
         *args,
@@ -139,7 +140,7 @@ class EventedWorker(LoopedWorker):
                     if event:
                         self._log.debug(
                             f"Received event: {event.msg_src}, "
-                            f"{event.msg_type}"
+                            f"{event.msg_type.name}"
                         )
                         self._handle_event(event)
 
@@ -166,9 +167,9 @@ class SXMLoopedWorker(EventedWorker, SXMStatusSubscriber):
         self._event_queues = [self.sxm_status_queue]
 
     def _handle_event(self, event: EventMessage):
-        if event.msg_type == EventMessage.SXM_RUNNING_EVENT:
+        if event.msg_type == Event.SXM_RUNNING:
             self._sxm_running = True
-        elif event.msg_type == EventMessage.SXM_STOPPED_EVENT:
+        elif event.msg_type == Event.SXM_STOPPED:
             self._sxm_running = False
         else:
             self._log.warning(
@@ -201,13 +202,13 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
         self._state.set_raw_live(raw_live_data)
 
     def _handle_event(self, event: EventMessage):
-        if event.msg_type == EventMessage.HLS_STREAM_STARTED:
+        if event.msg_type == Event.HLS_STREAM_STARTED:
             self._state.stream_data = event.msg
-        elif event.msg_type == EventMessage.UPDATE_METADATA_EVENT:
+        elif event.msg_type == Event.UPDATE_METADATA:
             self._state.set_raw_live(event.msg)
-        elif event.msg_type == EventMessage.UPDATE_CHANNELS_EVENT:
+        elif event.msg_type == Event.UPDATE_CHANNELS:
             self._state.channels = event.msg
-        elif event.msg_type == EventMessage.KILL_HLS_STREAM:
+        elif event.msg_type == Event.KILL_HLS_STREAM:
             self.local_shutdown_event.set()  # type: ignore
         else:
             self._log.warning(

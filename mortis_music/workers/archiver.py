@@ -1,10 +1,10 @@
 import os
 import time
-from typing import Union, Tuple, Dict, Optional
+from typing import Dict, Optional, Tuple, Union
 
+from ..queue import Event, EventMessage
 from ..utils import get_files, splice_file
 from .base import HLSLoopedWorker
-from ..queue import EventMessage
 
 __all__ = ["ArchiveWorker"]
 
@@ -83,7 +83,7 @@ class ArchiveWorker(HLSLoopedWorker):
         if not self._check_size(stream_file):
             self._log.error("archive not increasing, resetting channel")
             self.push_event(
-                EventMessage(self.name, EventMessage.KILL_HLS_STREAM, None)
+                EventMessage(self.name, Event.KILL_HLS_STREAM, None)
             )
             return False
         return True

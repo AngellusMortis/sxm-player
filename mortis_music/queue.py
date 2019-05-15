@@ -1,24 +1,32 @@
 import time
 import multiprocessing.queues as mpq
 from multiprocessing import get_context
-from typing import Optional
+from typing import Optional, Any
 from queue import Empty, Full
+from enum import Enum, auto
 
 DEFAULT_POLLING_TIMEOUT = 0.02
 
 
+class Event(Enum):
+    RESET_SXM = auto()
+    SXM_RUNNING = auto()
+    SXM_STOPPED = auto()
+    UPDATE_CHANNELS = auto()
+    UPDATE_METADATA = auto()
+    HLS_STREAM_STARTED = auto()
+    HLS_STDERROR_LINES = auto()
+    TRIGGER_HLS_STREAM = auto()
+    KILL_HLS_STREAM = auto()
+    DEBUG_START_PLAYER = auto()
+    DEBUG_STOP_PLAYER = auto()
+
+
 class EventMessage:
-    RESET_SXM_EVENT = "RESET_SXM"
-    SXM_RUNNING_EVENT = "SXM_RUNNING"
-    SXM_STOPPED_EVENT = "SXM_STOPPED"
-    UPDATE_CHANNELS_EVENT = "CHANNELS"
-    UPDATE_METADATA_EVENT = "METADATA"
-    HLS_STREAM_STARTED = "HLS_STREAM"
-    HLS_STDERROR_LINES = "HLS_STDERR"
-    TRIGGER_HLS_STREAM = "TRIGGER_HLS"
-    KILL_HLS_STREAM = "KILL_HLS_STREAM"
-    START_DEBUG_PLAYER = "DEBUG_START_PLAYER"
-    STOP_DEBUG_PLAYER = "DEBUG_STOP_PLAYER"
+    id: float
+    msg_src: str
+    msg_type: Event
+    msg: Any
 
     def __init__(self, msg_src, msg_type, msg):
         self.id = time.time()

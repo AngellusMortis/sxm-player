@@ -1,7 +1,7 @@
 import requests
 
+from ..queue import Event, EventMessage
 from .base import SXMLoopedWorker
-from ..queue import EventMessage
 
 __all__ = ["StatusWorker"]
 
@@ -36,14 +36,10 @@ class StatusWorker(SXMLoopedWorker):
             if not r.ok:
                 self.push_event(
                     EventMessage(
-                        self.name,
-                        EventMessage.RESET_SXM_EVENT,
-                        "bad status check",
+                        self.name, Event.RESET_SXM, "bad status check"
                     )
                 )
             else:
                 self.push_event(
-                    EventMessage(
-                        self.name, EventMessage.UPDATE_CHANNELS_EVENT, r.json()
-                    )
+                    EventMessage(self.name, Event.UPDATE_CHANNELS, r.json())
                 )

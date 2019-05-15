@@ -9,7 +9,7 @@ import click
 
 from . import handlers
 from .models import XMState
-from .queue import EventMessage
+from .queue import Event, EventMessage
 from .runner import Runner
 from .utils import CustomCommandClass
 from .workers import DebugWorker, ServerWorker, StatusWorker
@@ -131,7 +131,7 @@ def event_loop(runner: Runner, sxm_state: XMState, **kwargs):
     if not event:
         return
 
-    runner.log.debug(f"Received event: {event.msg_src}, {event.msg_type}")
+    runner.log.debug(f"Received event: {event.msg_src}, {event.msg_type.name}")
 
     was_connected: Optional[bool] = None
     if event.msg_src == ServerWorker.NAME:
@@ -146,14 +146,15 @@ def event_loop(runner: Runner, sxm_state: XMState, **kwargs):
                 f"{len(sxm_state.channels)} available"
             )
 
-            handlers.sxm_status_event(runner, EventMessage.SXM_RUNNING_EVENT)
+            handlers.sxm_status_event(runner, Event.SXM_RUNNING)
 
 
 def handle_event(event: EventMessage, **kwargs):
     runner = kwargs["runner"]
     debug = kwargs["debug"]
-    is_debug_event = event.msg_type.lower().startswith("debug")
-    handler_name = f"handle_{event.msg_type.lower()}_event"
+    event_name = event.msg_type.name.lower()
+    is_debug_event = event_name.startswith("debug")
+    handler_name = f"handle_{event_name}_event"
 
     if hasattr(handlers, handler_name) and (not is_debug_event or debug):
         getattr(handlers, handler_name)(event, **kwargs)
