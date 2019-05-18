@@ -30,33 +30,33 @@ from .workers import ServerWorker, StatusWorker
     "-l", "--log-file", type=click.Path(), default=None, help="output log file"
 )
 @click.option("-d", "--debug", is_flag=True, help="enable debug logging")
-# SiriusXM Parameters
+# SXM Parameters
 @click.option(
     "-p",
     "--port",
     type=int,
     default=9999,
-    help="port to run SiriusXM Proxy server on",
+    help="port to run SXM Proxy server on",
 )
 @click.option(
     "-h",
     "--host",
     type=str,
     default="127.0.0.1",
-    help="IP to bind SiriusXM Proxy server to",
+    help="IP to bind SXM Proxy server to",
 )
 @click.option(
     "--username",
     type=str,
     envvar="SXM_USERNAME",
-    help="SiriusXM Username",
+    help="SXM Username",
     required=True,
 )
 @click.option(
     "--password",
     type=str,
     envvar="SXM_PASSWORD",
-    help="SiriusXM Password",
+    help="SXM Password",
     required=True,
 )
 @click.option(
@@ -64,7 +64,7 @@ from .workers import ServerWorker, StatusWorker
     "--region",
     type=click.Choice(["US", "CA"]),
     default="US",
-    help="Sets the SiriusXM client's region",
+    help="Sets the SXM client's region",
 )
 # Archiving/Processing parameters
 @click.option(
@@ -96,7 +96,7 @@ def main(
     player_class: Type[BasePlayer],
     **kwargs,
 ):
-    """Command line interface for SiriusXM Player"""
+    """Command line interface for sxm-player"""
 
     if debug:
         set_start_method("spawn")
@@ -169,7 +169,7 @@ def event_loop(runner: Runner, state: PlayerState, **kwargs):
     if was_connected is False and state.is_connected:
         if not was_connected and state.is_connected:
             runner.log.info(
-                "SiriusXM Client started. " f"{len(state.channels)} available"
+                "SXM Client started. " f"{len(state.channels)} available"
             )
 
             state.sxm_running = True

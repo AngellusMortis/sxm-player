@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "SiriusXM Player: Debug Player",
+            "name": "SXM Player: Debug Player",
             "type": "python",
             "request": "launch",
             "module": "sxm_player",
@@ -18,7 +18,7 @@
             "subProcess": true
         },
         {
-            "name": "SiriusXM Player: CLI Player",
+            "name": "SXM Player: CLI Player",
             "type": "python",
             "request": "launch",
             "module": "sxm_player",

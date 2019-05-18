@@ -1,5 +1,5 @@
 ===============
-SiriusXM Player
+sxm-player
 ===============
 
 .. image:: https://readthedocs.org/projects/sxm-player/badge/?version=latest
@@ -8,7 +8,7 @@ SiriusXM Player
 
 
 
-A pluggable SiriusXM music player written in Python
+A pluggable SXM music player written in Python
 
 
 * Free software: MIT license
@@ -18,12 +18,12 @@ A pluggable SiriusXM music player written in Python
 Features
 --------
 
-* Provides a CLI SiriusXM client
-* Can easily provide any SiriusXM client via an anonymous HLS stream that can
+* Provides a CLI SXM client
+* Can easily provide any SXM client via an anonymous HLS stream that can
   be play on any comptaible remote client
-* Provides CLI interface to play SiriusXM channel to a MP3 file on disk
+* Provides CLI interface to play SXM channel to a MP3 file on disk
 * Can archive live streams from a channel and process any songs/shows from it
-* Pluggable API to allow you to create your own SiriusXM clients on top of it
+* Pluggable API to allow you to create your own SXM clients on top of it
 
 Credits
 -------

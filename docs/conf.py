@@ -48,7 +48,7 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = u"SiriusXM Player"
+project = u"sxm-player"
 copyright = u"2018, Christopher Bailey"
 author = u"Christopher Bailey"
 
@@ -129,7 +129,7 @@ latex_documents = [
     (
         master_doc,
         "sxm_player.tex",
-        u"SiriusXM Player Documentation",
+        u"sxm-player Documentation",
         u"Christopher Bailey",
         "manual",
     )
@@ -141,7 +141,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, "sxm_player", u"SiriusXM Player Documentation", [author], 1)
+    (master_doc, "sxm_player", u"sxm-player Documentation", [author], 1)
 ]
 
 
@@ -154,7 +154,7 @@ texinfo_documents = [
     (
         master_doc,
         "sxm_player",
-        u"SiriusXM Player Documentation",
+        u"sxm-player Documentation",
         author,
         "sxm_player",
         "One line description of project.",

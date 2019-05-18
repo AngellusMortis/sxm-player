@@ -4,36 +4,36 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Music: Create Virtual Env",
+            "label": "SXM Player: Create Virtual Env",
             "type": "shell",
             "command": "python3 -m venv ${config:python.venvPath}/${workspaceFolderBasename} && ${config:python.venvPath}/${workspaceFolderBasename}/bin/pip install -U pip wheel",
             "group": "build",
             "problemMatcher": []
         },
         {
-            "label": "Music: Python Setup",
+            "label": "SXM Player: Python Setup",
             "type": "shell",
             "command": "${config:python.venvPath}/${workspaceFolderBasename}/bin/python setup.py develop",
             "group": "build",
             "problemMatcher": [],
             "dependsOn": [
-                "Create Virtual Env"
+                "SXM Player: Create Virtual Env"
             ]
         },
         {
-            "label": "Music: Install Requirements",
+            "label": "SXM Player: Install Requirements",
             "type": "shell",
             "command": "${config:python.venvPath}/${workspaceFolderBasename}/bin/pip install -e \".[dev]\"",
             "group": "build",
             "problemMatcher": [],
             "dependsOn": [
-                "Python Setup"
+                "SXM Player: Python Setup"
             ]
         },
         {
-            "label": "Music: Install Local SXM",
+            "label": "SXM Player: Install Local SXM",
             "type": "shell",
-            "command": "${config:python.venvPath}/${workspaceFolderBasename}/bin/pip install -e ../SiriusXM",
+            "command": "${config:python.venvPath}/${workspaceFolderBasename}/bin/pip install -e ../sxm-client",
             "group": "build",
             "problemMatcher": []
         }

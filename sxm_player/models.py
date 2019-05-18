@@ -210,7 +210,7 @@ class PlayerState:
             extra_seconds = self.increase_cooldown()
 
             logger.info(
-                "Attempting to connect SiriusXM Client (next in "
+                "Attempting to connect SXM Client (next in "
                 f"{extra_seconds} seconds)"
             )
             return True

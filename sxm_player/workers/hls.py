@@ -113,7 +113,7 @@ class HLSWorker(SXMLoopedWorker, FFmpeg):
         now = time.time()
 
         if not self._state.sxm_running:
-            self._log.info(f"SiriusXM Client is dead, stopping {self.name}")
+            self._log.info(f"SXM Client is dead, stopping {self.name}")
             self.local_shutdown_event.set()
             return
         elif not self.check_process():

@@ -2,7 +2,7 @@ import logging
 from http.server import HTTPServer
 from typing import Callable
 
-from sxm import SiriusXMClient, make_http_handler
+from sxm import SXMClient, make_http_handler
 
 from ..queue import Event, EventMessage
 from ..signals import TerminateInterrupt
@@ -12,13 +12,13 @@ __all__ = ["ServerWorker"]
 
 
 class ServerWorker(InterruptableWorker):
-    """ SiriusXM Client proxy server for SiriusXM Player to interface with """
+    """ SXM Client proxy server for sxm-player to interface with """
 
     NAME = "sxm"
 
     _ip: str
     _port: int
-    sxm: SiriusXMClient
+    sxm: SXMClient
 
     def __init__(
         self,
@@ -35,7 +35,7 @@ class ServerWorker(InterruptableWorker):
         self._port = port
         self._ip = ip
 
-        self.sxm = SiriusXMClient(
+        self.sxm = SXMClient(
             username=username,
             password=password,
             region=region,
@@ -46,7 +46,7 @@ class ServerWorker(InterruptableWorker):
 
     def _make_update_handler(self) -> Callable[[dict], None]:
         """ Returns update handler to be called by
-        `SiriusXMClient.get_playlist` when a HLS playlist updates """
+        `SXMClient.get_playlist` when a HLS playlist updates """
 
         def update_handler(data: dict) -> None:
             self.push_event(
@@ -63,7 +63,7 @@ class ServerWorker(InterruptableWorker):
         )
 
     def run(self) -> None:
-        """ Runs SiriusXM proxy server """
+        """ Runs SXM proxy server """
 
         self.send_channel_list()
 

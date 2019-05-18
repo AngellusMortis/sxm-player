@@ -1,5 +1,5 @@
-Welcome to SiriusXM Player's documentation!
-================================================
+Welcome to sxm-player's documentation!
+======================================
 
 .. toctree::
    :maxdepth: 2

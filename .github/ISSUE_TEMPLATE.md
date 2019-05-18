@@ -1,4 +1,4 @@
-* SiriusXM Player version:
+* sxm-player version:
 * Python version:
 * Operating System:
 

@@ -80,7 +80,7 @@ def handle_reset_sxm_event(
         cooldown = state.increase_cooldown()
 
         runner.log.warning(
-            "SiriusXM Client acting up, restarting it (cooldown: "
+            "SXM Client acting up, restarting it (cooldown: "
             f"{cooldown} seconds)"
         )
 

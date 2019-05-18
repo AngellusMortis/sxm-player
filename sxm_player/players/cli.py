@@ -14,7 +14,7 @@ class CLIPlayer(BasePlayer):
             "--channel-id",
             required=True,
             type=str,
-            help="SiriusXM Channel to Player",
+            help="SXM Channel to Player",
         ),
         Option(
             "--filename",
