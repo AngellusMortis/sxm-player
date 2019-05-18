@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Top-level package for Discord SiriusXM Bot."""
+"""Top-level package for SiriusXM Player."""
 
 __author__ = """Christopher Bailey"""
 __email__ = "cbailey@mort.is"

@@ -12,7 +12,7 @@ FFMPEG_COMMAND = "ffmpeg -y -loglevel fatal -f mpegts -i {} {}"
 
 
 class DebugWorker(InterruptableWorker):
-    """ SiriusXMProxy Server for Discord bot to interface with """
+    """ DebugWorker to be used for development """
 
     NAME = "debug"
 

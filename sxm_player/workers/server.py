@@ -12,7 +12,7 @@ __all__ = ["ServerWorker"]
 
 
 class ServerWorker(InterruptableWorker):
-    """ SiriusXMProxy Server for Discord bot to interface with """
+    """ SiriusXM Client proxy server for SiriusXM Player to interface with """
 
     NAME = "sxm"
 

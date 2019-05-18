@@ -93,7 +93,7 @@ def main(
     reset_songs: bool,
     player_class: Type[BasePlayer],
 ):
-    """Command line interface for SiriusXM radio bot for Discord"""
+    """Command line interface for SiriusXM Player"""
 
     if debug:
         set_start_method("spawn")

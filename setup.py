@@ -45,12 +45,11 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
     ],
-    description="A Discord bot that will play SiriusXM radio stations.",
+    description="A pluggable SiriusXM music player written in Python",
     entry_points={"console_scripts": ["sxm-player=sxm_player.cli:main"]},
     install_requires=requirements["requirements"],
     dependency_links=[
-        "https://github.com/Rapptz/discord.py/tarball/rewrite#egg=discord.py",
-        "https://github.com/AngellusMortis/SiriusXM/tarball/master#egg=sxm",
+        "https://github.com/AngellusMortis/SiriusXM/tarball/master#egg=sxm"
     ],
     license="MIT license",
     long_description=readme + "\n\n" + history,
