@@ -5,9 +5,7 @@ import shlex
 import subprocess  # nosec
 from typing import List, Optional, Union
 
-import click
 import coloredlogs
-import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
@@ -26,52 +24,6 @@ unrelated_loggers = [
 ]
 
 logger = logging.getLogger("mortis_music.utils")
-
-
-class CustomCommandClass(click.Command):
-    def invoke(self, context):
-        self.load_config(context)
-        self.validate_params(context)
-
-        return super(CustomCommandClass, self).invoke(context)
-
-    def load_config(self, context):
-        config_file = context.params["config_file"]
-
-        if config_file is not None and os.path.exists(config_file):
-            with open(config_file) as f:
-                config_data = yaml.safe_load(f)
-                self.merge_configs(context, config_data)
-
-    def merge_configs(self, context, config_data):
-        for param, value in context.params.items():
-            if value is None and param in config_data:
-                context.params[param] = config_data[param]
-
-    def validate_params(self, context):
-        if context.params["port"] is None:
-            context.params["port"] = 9999
-        if context.params["host"] is None:
-            context.params["host"] = "127.0.0.1"
-
-        if context.params["username"] is None:
-            raise click.BadParameter(
-                "SiriusXM Username is required",
-                ctx=context,
-                param=context.params.get("username"),
-            )
-        elif context.params["password"] is None:
-            raise click.BadParameter(
-                "SiriusXM Password is required",
-                ctx=context,
-                param=context.params.get("password"),
-            )
-        # elif context.params["token"] is None:
-        #     raise click.BadParameter(
-        #         "Discord Token is required",
-        #         ctx=context,
-        #         param=context.params.get("token"),
-        #     )
 
 
 def init_db(

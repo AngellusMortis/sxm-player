@@ -27,9 +27,11 @@ __all__ = [
 
 
 class BaseWorker:
+    NAME = "worker"
+
     _log: logging.Logger
 
-    name: str = "worker"
+    name: str = NAME
     int_handler: staticmethod = staticmethod(default_signal_handler)
     term_handler: staticmethod = staticmethod(default_signal_handler)
     startup_event: MPEvent  # type: ignore

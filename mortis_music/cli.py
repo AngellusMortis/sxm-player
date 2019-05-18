@@ -3,22 +3,26 @@
 """Console script for mortis_music."""
 import os
 from multiprocessing import set_start_method
-from typing import Optional
+from typing import Optional, Type
 
 import click
 
 from . import handlers
+from .command import ConfigCommandClass, PlayerClass
 from .models import PlayerState
+from .players import BasePlayer
 from .queue import Event, EventMessage
 from .runner import Runner
-from .utils import CustomCommandClass
-from .workers import DebugWorker, ServerWorker, StatusWorker
+from .workers import ServerWorker, StatusWorker
 
 
-@click.command(cls=CustomCommandClass)
+@click.command(cls=ConfigCommandClass)
 # Generic Parameters
 @click.option(
-    "--config-file", type=click.Path(), help="Config file to read vars from"
+    "-c",
+    "--config-file",
+    type=click.Path(),
+    help="Config file to read vars from",
 )
 @click.option(
     "-l", "--log-file", type=click.Path(), default=None, help="output log file"
@@ -29,22 +33,29 @@ from .workers import DebugWorker, ServerWorker, StatusWorker
     "-p",
     "--port",
     type=int,
-    default=None,
+    default=9999,
     help="port to run SiriusXM Proxy server on",
 )
 @click.option(
     "-h",
     "--host",
     type=str,
-    default=None,
-    help="IP to bind SiriusXM Proxy server to. "
-    "Must still be accessible via 127.0.0.1",
+    default="127.0.0.1",
+    help="IP to bind SiriusXM Proxy server to",
 )
 @click.option(
-    "--username", type=str, envvar="SXM_USERNAME", help="SiriusXM Username"
+    "--username",
+    type=str,
+    envvar="SXM_USERNAME",
+    help="SiriusXM Username",
+    required=True,
 )
 @click.option(
-    "--password", type=str, envvar="SXM_PASSWORD", help="SiriusXM Password"
+    "--password",
+    type=str,
+    envvar="SXM_PASSWORD",
+    help="SiriusXM Password",
+    required=True,
 )
 @click.option(
     "-r",
@@ -65,6 +76,10 @@ from .workers import DebugWorker, ServerWorker, StatusWorker
 @click.option(
     "-r", "--reset-songs", is_flag=True, help="reset processed song database"
 )
+# Player paramaters
+@click.argument(
+    "player_class", type=PlayerClass(), required=False, default=None
+)
 def main(
     config_file: str,
     log_file: str,
@@ -76,6 +91,7 @@ def main(
     host: str,
     output_folder: str,
     reset_songs: bool,
+    player_class: Type[BasePlayer],
 ):
     """Command line interface for SiriusXM radio bot for Discord"""
 
@@ -86,8 +102,8 @@ def main(
     os.system("/usr/bin/clear")  # nosec
 
     with Runner(log_file, debug) as runner:
-        if debug and DebugWorker is not None:
-            runner.create_worker(DebugWorker, DebugWorker.NAME)
+        # if debug and DebugWorker is not None:
+        #     runner.create_worker(DebugWorker, DebugWorker.NAME)
 
         state = PlayerState()
 
@@ -98,6 +114,11 @@ def main(
             ip=host,
             sxm_status=state.sxm_running,
         )
+
+        if player_class is not None:
+            worker_class = player_class.get_worker()
+            if worker_class is not None:
+                runner.create_worker(worker_class, worker_class.NAME)
 
         while not runner.shutdown_event.is_set():  # type: ignore
             event_loop(**locals())

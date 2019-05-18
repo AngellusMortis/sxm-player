@@ -1,6 +1,7 @@
 import os
 import time
 from typing import Optional
+from bdb import BdbQuit
 
 from ..queue import Event, EventMessage
 from .base import ComboLoopedWorker, FFmpegPlayer, InterruptableWorker
@@ -18,7 +19,10 @@ class DebugWorker(InterruptableWorker):
     _num: int = 0
 
     def run(self) -> None:
-        self.debug()
+        try:
+            self.debug()
+        except BdbQuit:
+            self._log.error("No debugger to break for")
 
     def debug(self):
         self.nothing_to_see_here()
