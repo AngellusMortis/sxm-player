@@ -169,7 +169,7 @@ class Runner:
             log_level = "DEBUG"
 
         configure_root_logger(log_level, log_file)
-        self.log = logging.getLogger("mortis_music")
+        self.log = logging.getLogger("sxm_player")
         self.log_level = log_level
         self.log_file = log_file
 

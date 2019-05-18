@@ -1,4 +1,4 @@
-Welcome to Mortis Music Bot's documentation!
+Welcome to SiriusXM Player's documentation!
 ================================================
 
 .. toctree::

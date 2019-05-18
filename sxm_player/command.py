@@ -7,7 +7,7 @@ import yaml
 
 from .players import BasePlayer
 
-BASE_PLAYER = "mortis_music.players.BasePlayer "
+BASE_PLAYER = "sxm_player.players.BasePlayer "
 
 
 class ConfigCommandClass(click.Command):
@@ -47,7 +47,7 @@ class PlayerClass(click.ParamType):
 
     def convert(self, value, param, ctx):
         if "." not in value:
-            module_path = "mortis_music.players"
+            module_path = "sxm_player.players"
             class_name = value
         else:
             try:

@@ -67,7 +67,7 @@ class ServerWorker(InterruptableWorker):
 
         self.send_channel_list()
 
-        request_logger = logging.getLogger("mortis_music.server.request")
+        request_logger = logging.getLogger("sxm_player.server.request")
 
         httpd = HTTPServer(
             (self._ip, self._port),

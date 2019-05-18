@@ -23,7 +23,7 @@ unrelated_loggers = [
     "websockets.protocol",
 ]
 
-logger = logging.getLogger("mortis_music.utils")
+logger = logging.getLogger("sxm_player.utils")
 
 
 def init_db(

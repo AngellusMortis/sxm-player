@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Mortis Music: Debug Player",
+            "name": "SiriusXM Player: Debug Player",
             "type": "python",
             "request": "launch",
-            "module": "mortis_music",
+            "module": "sxm_player",
             "args": [
                 "-c",
                 "${workspaceFolder}/.env.yml",

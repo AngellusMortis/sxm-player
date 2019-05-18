@@ -48,7 +48,7 @@ class BaseWorker:
         *args,
         **kwargs,
     ):
-        self._log = logging.getLogger(f"mortis_music.{name}")
+        self._log = logging.getLogger(f"sxm_player.{name}")
 
         self.name = name
 

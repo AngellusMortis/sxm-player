@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Console script for mortis_music."""
+"""Console script for sxm_player."""
 import os
 from multiprocessing import set_start_method
 from typing import Optional, Type
