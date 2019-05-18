@@ -1,4 +1,4 @@
-from typing import List, Optional, Type
+from typing import List, Optional, Tuple, Type
 
 import click
 
@@ -11,5 +11,5 @@ class BasePlayer:
         return []
 
     @staticmethod
-    def get_worker() -> Optional[Type[BaseWorker]]:
+    def get_worker_args() -> Optional[Tuple[Type[BaseWorker], str, dict]]:
         return None

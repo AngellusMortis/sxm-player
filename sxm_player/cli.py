@@ -6,6 +6,7 @@ from multiprocessing import set_start_method
 from typing import Optional, Type
 
 import click
+import psutil
 
 from . import handlers
 from .command import ConfigCommandClass, PlayerClass
@@ -13,6 +14,7 @@ from .models import PlayerState
 from .players import BasePlayer
 from .queue import Event, EventMessage
 from .runner import Runner
+from .utils import ACTIVE_PROCESS_STATUSES
 from .workers import ServerWorker, StatusWorker
 
 
@@ -98,13 +100,9 @@ def main(
     if debug:
         set_start_method("spawn")
 
-    # context = click.get_current_context()
     os.system("/usr/bin/clear")  # nosec
 
     with Runner(log_file, debug) as runner:
-        # if debug and DebugWorker is not None:
-        #     runner.create_worker(DebugWorker, DebugWorker.NAME)
-
         state = PlayerState()
 
         runner.create_worker(
@@ -116,9 +114,12 @@ def main(
         )
 
         if player_class is not None:
-            worker_class = player_class.get_worker()
-            if worker_class is not None:
-                runner.create_worker(worker_class, worker_class.NAME)
+            worker_args = player_class.get_worker_args()
+            if worker_args is not None:
+                state.player_name = worker_args[1]
+                runner.create_worker(
+                    worker_args[0], worker_args[1], **(worker_args[2])
+                )
 
         while not runner.shutdown_event.is_set():  # type: ignore
             event_loop(**locals())
@@ -175,6 +176,8 @@ def event_loop(runner: Runner, state: PlayerState, **kwargs):
                 runner, Event.SXM_STATUS, state.sxm_running
             )
 
+    check_player(runner, state)
+
 
 def handle_event(event: EventMessage, **kwargs):
     runner = kwargs["runner"]
@@ -189,3 +192,20 @@ def handle_event(event: EventMessage, **kwargs):
         runner.log.warning(
             f"Unknown event received: {event.msg_src}, {event.msg_type}"
         )
+
+
+def check_player(runner: Runner, state: PlayerState):
+    if state.player_name is not None:
+        player = runner.workers.get(state.player_name)
+        running = True
+
+        if player is None:
+            running = False
+        else:
+            process = psutil.Process(player.process.pid)
+            if process.status() not in ACTIVE_PROCESS_STATUSES:
+                running = False
+
+        if not running:
+            runner.log.info("Player has stopped, shutting down")
+            runner.shutdown_event.set()  # type: ignore

@@ -6,7 +6,7 @@ from .queue import Event, EventMessage
 from .runner import Runner, Worker
 from .workers import (
     ArchiveWorker,
-    DebugHLSPlayer,
+    CLIPlayerWorker,
     HLSWorker,
     ProcessorWorker,
     ServerWorker,
@@ -227,45 +227,44 @@ def handle_hls_stderror_lines_event(
         handle_reset_sxm_event(event, runner, state)
 
 
-if DebugHLSPlayer is not None:
+def handle_debug_start_player_event(
+    event: EventMessage, runner: Runner, state: PlayerState, **kwargs
+):
 
-    def handle_debug_start_player_event(
-        event: EventMessage, runner: Runner, state: PlayerState, **kwargs
+    player_name = event.msg[0]
+    channel_id = event.msg[1]
+    filename = event.msg[2]
+    stream_protocol = event.msg[3]
+
+    if (
+        state.stream_channel is not None
+        and channel_id not in state.stream_channel
     ):
+        runner.log.warning(
+            "Cannot start player, different HLS stream "
+            f"playing: {state.stream_url}"
+        )
+    else:
+        runner.create_worker(
+            CLIPlayerWorker,
+            player_name,
+            filename=filename,
+            stream_protocol=stream_protocol,
+            sxm_status=state.sxm_running,
+            stream_data=(channel_id, state.stream_url),
+            channels=state.get_raw_channels(),
+            raw_live_data=state.get_raw_live(),
+        )
 
-        player_name = event.msg[0]
-        channel_id = event.msg[1]
-        filename = event.msg[2]
-        stream_protocol = event.msg[3]
 
-        if (
-            state.stream_channel is not None
-            and channel_id not in state.stream_channel
-        ):
-            runner.log.warning(
-                "Cannot start player, different HLS stream "
-                f"playing: {state.stream_url}"
-            )
-        else:
-            runner.create_worker(
-                DebugHLSPlayer,
-                player_name,
-                filename=filename,
-                stream_protocol=stream_protocol,
-                sxm_status=state.sxm_running,
-                stream_data=(channel_id, state.stream_url),
-                channels=state.get_raw_channels(),
-                raw_live_data=state.get_raw_live(),
-            )
+def handle_debug_stop_player_event(
+    event: EventMessage, runner: Runner, **kwargs
+):
 
-    def handle_debug_stop_player_event(
-        event: EventMessage, runner: Runner, **kwargs
-    ):
-
-        worker = runner.workers.get(event.msg)
-        if worker is None:
-            runner.log.warning(
-                f"Debug Player {event.msg} is not currently running"
-            )
-        else:
-            worker.full_stop()
+    worker = runner.workers.get(event.msg)
+    if worker is None:
+        runner.log.warning(
+            f"Debug Player {event.msg} is not currently running"
+        )
+    else:
+        worker.full_stop()

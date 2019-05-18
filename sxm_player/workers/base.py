@@ -1,12 +1,7 @@
 import logging
-import select
-import shlex
-import subprocess  # nosec
 import time
 from multiprocessing import Event as MPEvent
 from typing import List, Optional, Tuple
-
-import psutil
 
 from ..models import PlayerState
 from ..queue import Event, EventMessage, Queue
@@ -244,57 +239,3 @@ class ComboLoopedWorker(
         self._state.sxm_running = sxm_status
         self._state.stream_data = stream_data
         self._state.set_raw_live(raw_live_data)
-
-
-class FFmpegPlayer:
-    ACTIVE_STATUS = [
-        psutil.STATUS_RUNNING,
-        psutil.STATUS_SLEEPING,
-        psutil.STATUS_DISK_SLEEP,
-    ]
-
-    command: str
-    process: Optional[subprocess.Popen] = None
-
-    _stderr_poll: Optional[select.poll] = None  # pylint: disable=E1101
-
-    def start_ffmpeg(self) -> None:
-        ffmpeg_args = shlex.split(self.command)
-
-        self.process = subprocess.Popen(  # nosec
-            ffmpeg_args, stderr=subprocess.PIPE
-        )
-
-        self._stderr_poll = select.poll()  # pylint: disable=E1101
-        self._stderr_poll.register(
-            self.process.stderr, select.POLLIN  # pylint: disable=E1101 # noqa
-        )
-
-    def check_process(self) -> bool:
-        if self.process is None:
-            return False
-
-        process = psutil.Process(self.process.pid)
-        status = process.status()
-
-        return status in FFmpegPlayer.ACTIVE_STATUS
-
-    def stop_ffmpeg(self) -> None:
-        if self.process is None:
-            return
-
-        self.process.kill()
-        if self.process.poll() is None:
-            self.process.communicate()
-
-        self.process = None
-
-    def read_errors(self) -> List[str]:
-        if self.process is None or self._stderr_poll is None:
-            return []
-
-        lines: List[str] = []
-        while self._stderr_poll.poll(0.1):
-            lines.append(self.process.stderr.readline().decode("utf8"))
-
-        return lines

@@ -3,8 +3,9 @@ import tempfile
 import time
 from typing import Optional, Tuple
 
+from ..utils import FFmpeg
 from ..queue import Event, EventMessage
-from .base import FFmpegPlayer, SXMLoopedWorker
+from .base import SXMLoopedWorker
 
 __all__ = ["HLSWorker"]
 
@@ -18,7 +19,7 @@ FFMPEG_PROTOCOLS = [
 ]
 
 
-class HLSWorker(SXMLoopedWorker, FFmpegPlayer):
+class HLSWorker(SXMLoopedWorker, FFmpeg):
     NAME = "hls"
 
     channel_id: str

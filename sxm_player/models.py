@@ -93,6 +93,7 @@ class PlayerState:
     processed_folder: Optional[str] = None
     db_reset: bool = False
     sxm_running: bool = False
+    player_name: Optional[str] = None
 
     _db: Optional[Session] = None
     _raw_channels: Optional[List[dict]] = None
