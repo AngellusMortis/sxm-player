@@ -43,7 +43,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
                 )
 
                 time.sleep(3)
-                self._log.info(f"Debug Player start: {self.name}")
+                self._log.info(f"CLI Player start: {self.name}")
                 self.start_ffmpeg()
         elif not self.check_process():
             self._log.info(

@@ -1,6 +1,6 @@
 import importlib
 import inspect
-from typing import Optional
+from typing import Optional, Type
 
 import click
 import yaml
@@ -17,7 +17,36 @@ class ConfigCommandClass(click.Command):
             config = self.load_config(config_file)
             extra["default_map"] = config
 
-        return super().make_context(info_name, args, parent, **extra)
+        response = super().make_context(info_name, args, parent, **extra)
+        return response
+
+    def parse_args(self, context, args):
+        parser = self.make_parser(context)
+        options, _, _ = parser.parse_args(args=args.copy())
+
+        if "player_class" in options:
+            player_class = self.get_player_class(context, options)
+            if player_class is not None:
+                self.params = self.params + player_class.get_params()
+
+        return super().parse_args(context, args)
+
+    def get_player_class(self, context, options) -> Optional[Type[BasePlayer]]:
+        player_param = None
+        player_class = None
+
+        for param in self.params:
+            if param.human_readable_name == "PLAYER_CLASS":
+                player_param = param
+                break
+
+        if player_param is not None:
+            player_param.expose_value = False
+            player_class, _ = player_param.handle_parse_result(
+                context, options, []
+            )
+            player_param.expose_value = True
+        return player_class
 
     def get_config_file(self, args: list) -> Optional[str]:
         config_file = None
@@ -46,14 +75,10 @@ class PlayerClass(click.ParamType):
     name = "python_class"
 
     def convert(self, value, param, ctx):
-        if "." not in value:
-            module_path = "sxm_player.players"
-            class_name = value
-        else:
-            try:
-                module_path, class_name = value.rsplit(".", 1)
-            except ValueError:
-                self.fail(f"{value} is not a Python path")
+        if not isinstance(value, str) and issubclass(value, BasePlayer):
+            return value
+
+        module_path, class_name = self._get_module(value)
 
         try:
             module = importlib.import_module(module_path)
@@ -72,3 +97,14 @@ class PlayerClass(click.ParamType):
             self.fail(f"{class_name} does not inherit from {BASE_PLAYER}")
 
         return klass
+
+    def _get_module(self, class_name):
+        module_path = "sxm_player.players"
+
+        if "." in class_name:
+            try:
+                module_path, class_name = class_name.rsplit(".", 1)
+            except ValueError:
+                self.fail(f"{class_name} is not a Python path")
+
+        return (module_path, class_name)

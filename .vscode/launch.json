@@ -16,6 +16,19 @@
             ],
             "console": "integratedTerminal",
             "subProcess": true
+        },
+        {
+            "name": "SiriusXM Player: CLI Player",
+            "type": "python",
+            "request": "launch",
+            "module": "sxm_player",
+            "args": [
+                "-c",
+                "${workspaceFolder}/.env.yml",
+                "CLIPlayer",
+            ],
+            "console": "integratedTerminal",
+            "subProcess": true
         }
     ]
 }

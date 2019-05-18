@@ -94,6 +94,7 @@ def main(
     output_folder: str,
     reset_songs: bool,
     player_class: Type[BasePlayer],
+    **kwargs,
 ):
     """Command line interface for SiriusXM Player"""
 
@@ -114,7 +115,7 @@ def main(
         )
 
         if player_class is not None:
-            worker_args = player_class.get_worker_args()
+            worker_args = player_class.get_worker_args(**locals())
             if worker_args is not None:
                 state.player_name = worker_args[1]
                 runner.create_worker(
