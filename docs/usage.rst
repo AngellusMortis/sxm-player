@@ -87,3 +87,22 @@ with `_`.
 .. code-block:: console
 
     $ sxm-player -c /path/to/config
+
+Player Classes
+--------------
+
+`sxm-player` offers a pluggable way to create players to run on top of it. To use a player class, just add it to the end of the `sxm-player` command as an argument.
+
+.. code-block:: console
+
+    $ sxm-player PlayerClass
+
+CLIPlayer
++++++++++
+
+Out of the box, `sxm-player` only provides one player class. `CLIPlayer`. This
+player just plays a given SXM channel to a `mp3` file on disk locally.
+
+.. code-block:: console
+
+    $ sxm-player CLIPlayer --channel-id octane --filename octane.mp3
