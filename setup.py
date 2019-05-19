@@ -51,7 +51,9 @@ setup(
     include_package_data=True,
     keywords="sxm_player",
     name="sxm_player",
-    packages=find_packages(include=["sxm_player"]),
+    packages=find_packages(
+        include=["sxm_player", "sxm_player.*"], exclude=["*.debug"]
+    ),
     setup_requires=requirements["setup"],
     test_suite="tests",
     tests_require=requirements["dev"],

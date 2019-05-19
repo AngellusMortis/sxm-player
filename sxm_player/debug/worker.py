@@ -2,7 +2,7 @@ import os
 from bdb import BdbQuit
 
 from ..queue import Event, EventMessage
-from .base import InterruptableWorker
+from ..workers.base import InterruptableWorker
 
 __all__ = ["DebugWorker"]
 
