@@ -68,6 +68,30 @@ playback.
 
     $ sxm-player --output-folder /path/to/output
 
+This will create the following directory structure in the output folder::
+
+    archive
+        <channel_id>
+            <channel_id>.<start_time>.<end_time>.mp3
+    processed
+        <channel_id>
+            shows
+                ... organized mp3 files for shows here
+            songs
+                ... organized mp3 files for songs here
+        songs.db
+    streams
+        <channel_id>.mp3
+
+You should never touch any of these files while the bot is running. Especially
+the `mp3` files in the `streams` folder.
+
+`mp3` files for songs/shows are not currently tagged with any metadata because
+they are not a perfect fit for when the song/show starts. As a result, I do not
+recommend trying to use the `mp3` files that get generated in any other type of
+music player. If anyone wants to help get them to be a better fit, help would
+be appreicated!
+
 Config File
 +++++++++++
 

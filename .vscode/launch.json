@@ -29,6 +29,19 @@
             ],
             "console": "integratedTerminal",
             "subProcess": true
+        },
+        {
+            "name": "SXM Player: Discord Player",
+            "type": "python",
+            "request": "launch",
+            "module": "sxm_player",
+            "args": [
+                "-c",
+                "${workspaceFolder}/.env.yml",
+                "sxm_discord.DiscordPlayer",
+            ],
+            "console": "integratedTerminal",
+            "subProcess": true
         }
     ]
 }
