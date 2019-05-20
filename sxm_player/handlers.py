@@ -156,14 +156,19 @@ def handle_kill_hls_stream_event(
 
     state.stream_data = (None, None)
 
-    hls_worker = runner.workers.get(HLSWorker.NAME)
     hls_kill_event(runner)
-    if hls_worker is not None:
-        hls_worker.full_stop()
+    for worker_name in (
+        HLSWorker.NAME,
+        ArchiveWorker.NAME,
+        ProcessorWorker.NAME,
+    ):
+        worker = runner.workers.get(HLSWorker.NAME)
+        if worker is not None:
+            worker.full_stop()
 
-        runner.log.info(f"Terminated {HLSWorker.NAME} worker")
+            runner.log.info(f"Terminated {worker_name} worker")
 
-        del runner.workers[HLSWorker.NAME]
+            del runner.workers[worker_name]
 
 
 def handle_hls_stream_started_event(
