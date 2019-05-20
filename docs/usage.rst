@@ -115,11 +115,23 @@ with `_`.
 Player Classes
 --------------
 
-`sxm-player` offers a pluggable way to create players to run on top of it. To use a player class, just add it to the end of the `sxm-player` command as an argument.
+`sxm-player` offers a pluggable way to create players to run on top of it. To
+use a player class, just add it to the end of the `sxm-player` command as an
+argument.
 
 .. code-block:: console
 
     $ sxm-player PlayerClass
+
+Here are a list of know pluggable player classes you can use to extend
+`sxm-player`
+
+* `sxm-discord`_: A Discord bot that lets you play SXM content
+
+If you have developed your own player class, make a PR to add it here! Or
+make an issue for me to add it.
+
+.. _sxm-discord: https://github.com/AngellusMortis/sxm-discord
 
 CLIPlayer
 +++++++++
