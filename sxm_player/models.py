@@ -99,7 +99,7 @@ class PlayerState:
     _raw_channels: Optional[List[dict]] = None
     _raw_live: Optional[dict] = None
     _channels: Optional[List[XMChannel]] = None
-    _live: Optional[XMLiveChannel]
+    _live: Optional[XMLiveChannel] = None
     _failures: int = 0
     _cooldown: float = 0
     _start_time: Optional[float] = None
@@ -192,6 +192,23 @@ class PlayerState:
 
         if self._raw_live is not None:
             self._live = XMLiveChannel(self._raw_live)
+
+    @property
+    def radio_time(self) -> Union[int, None]:
+        """ Returns current time for the radio """
+
+        if self.live is None:
+            return None
+        # still working on offset:  - self.time_offset
+        return int(time.time() * 1000)
+
+    @property
+    def start_time(self) -> Union[float, None]:
+        """ Returns the start time for the current SiriusXM channel """
+
+        if self.live is None:
+            return None
+        return self._start_time
 
     @property
     def is_connected(self) -> bool:

@@ -64,6 +64,8 @@ def push_event(
 def handle_update_channels_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
+    """ event.msg == `PlayerState.get_raw_channels()` """
+
     state.channels = event.msg
 
     hls_channels_event(runner, state.get_raw_channels())
@@ -72,6 +74,7 @@ def handle_update_channels_event(
 def handle_reset_sxm_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
+    """ event.msg == None """
 
     sxm_worker = runner.workers.get(ServerWorker.NAME)
     if sxm_worker is not None:
@@ -99,6 +102,7 @@ def handle_trigger_hls_stream_event(
     output_folder: str,
     **kwargs,
 ):
+    """ event.msg == (channel_name: str, stream_protocol: str) """
 
     hls_worker = runner.workers.get(HLSWorker.NAME)
     stream_folder: Optional[str] = None
@@ -148,6 +152,7 @@ def handle_trigger_hls_stream_event(
 def handle_kill_hls_stream_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
+    """ event.msg == None """
 
     state.stream_data = (None, None)
 
@@ -169,6 +174,7 @@ def handle_hls_stream_started_event(
     reset_songs: bool,
     **kwargs,
 ):
+    """ event.msg == (channel_name: str, stream_url: str) """
 
     stream_folder: Optional[str] = None
     archive_folder: Optional[str] = None
@@ -207,6 +213,7 @@ def handle_hls_stream_started_event(
 def handle_update_metadata_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
+    """ event.msg == (state.get_raw_live()) """
 
     state.stream_channel = event.msg["channelId"]
     state.live = event.msg
@@ -216,6 +223,8 @@ def handle_update_metadata_event(
 def handle_hls_stderror_lines_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
+    """ event.msg == lines: List[str] """
+
     do_reset = False
     for line in event.msg:
         runner.log.debug(f"ffmpeg STDERR: {line}")
@@ -230,6 +239,7 @@ def handle_hls_stderror_lines_event(
 def handle_debug_start_player_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
+    """ event.msg == (player_name: str, channel_id: str, filename: str, stream_protocol: str) """
 
     player_name = event.msg[0]
     channel_id = event.msg[1]
@@ -260,6 +270,7 @@ def handle_debug_start_player_event(
 def handle_debug_stop_player_event(
     event: EventMessage, runner: Runner, **kwargs
 ):
+    """ event.msg == player_name: str """
 
     worker = runner.workers.get(event.msg)
     if worker is None:

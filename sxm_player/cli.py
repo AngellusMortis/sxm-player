@@ -169,7 +169,7 @@ def event_loop(runner: Runner, state: PlayerState, **kwargs):
     if was_connected is False and state.is_connected:
         if not was_connected and state.is_connected:
             runner.log.info(
-                "SXM Client started. " f"{len(state.channels)} available"
+                f"SXM Client started. {len(state.channels)} channels available"
             )
 
             state.sxm_running = True
