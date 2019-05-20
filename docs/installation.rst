@@ -23,18 +23,48 @@ non-python requirements.
 .. _ffmpeg: https://ffmpeg.org/download.html
 
 
-Github
-------
+Stable release
+--------------
 
-`sxm_player` is not avaible on PyPi quite yet and some of its
-depenencies are not yet either. As a result installting it is a bit more
-difficult. Thisassumes your Python 3 executable is just `python` if it
-is not, replace it with `python3` or whatever it actually is.
+To install sxm-player, run this command in your terminal:
+
+.. code-block:: console
+
+    $ pip install sxm-player
+
+This is the preferred method to install sxm-player, as it will always install
+the most recent stable release.
+
+If you don't have `pip`_ installed, this `Python installation guide`_ can guide
+you through the process.
+
+.. _pip: https://pip.pypa.io
+.. _Python installation guide: http://docs.python-guide.org/en/latest/starting/installation/
+
+
+From sources
+------------
+
+The sources for sxm-client can be downloaded from the `Github repo`_.
+
+You can either clone the public repository:
 
 .. code-block:: console
 
     $ git clone git://github.com/AngellusMortis/sxm-player
-    $ cd sxm_player
-    $ python -m venv            # this line and the next are optional
-    $ source venv/bin/activate  # but if you do not do it then you have to
-    $ python setup.py install   # <- run this command with sudo
+
+Or download the `tarball`_:
+
+.. code-block:: console
+
+    $ curl  -OL https://github.com/AngellusMortis/sxm-player/tarball/master
+
+Once you have a copy of the source, you can install it with:
+
+.. code-block:: console
+
+    $ python setup.py install
+
+
+.. _Github repo: https://github.com/AngellusMortis/sxm
+.. _tarball: https://github.com/AngellusMortis/sxm/tarball/master
