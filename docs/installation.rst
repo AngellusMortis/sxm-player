@@ -45,7 +45,7 @@ you through the process.
 From sources
 ------------
 
-The sources for sxm-client can be downloaded from the `Github repo`_.
+The sources for sxm-player can be downloaded from the `Github repo`_.
 
 You can either clone the public repository:
 
@@ -66,5 +66,5 @@ Once you have a copy of the source, you can install it with:
     $ python setup.py install
 
 
-.. _Github repo: https://github.com/AngellusMortis/sxm
-.. _tarball: https://github.com/AngellusMortis/sxm/tarball/master
+.. _Github repo: https://github.com/AngellusMortis/sxm-player
+.. _tarball: https://github.com/AngellusMortis/sxm-player/tarball/master
