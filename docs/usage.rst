@@ -6,7 +6,7 @@ Usage
 
     `sxm-player` is a 100% unofficial project and you use it at your own risk.
     It is designed to be used for personal use with a small number of users
-    listening to it at once. Similar to playing music over a speak from the
+    listening to it at once. Similar to playing music over a speakers from the
     radio directly. Using `sxm-player` in any corporate setting, to
     attempt to priate music, or to try to make a profit off your subscription
     may result in you getting in legal trouble.
