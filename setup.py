@@ -33,8 +33,9 @@ setup(
     author="Christopher Bailey",
     author_email="cbailey@mort.is",
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
+        "Intended Audience :: End Users/Desktop",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
         "Programming Language :: Python :: 3",
@@ -47,7 +48,7 @@ setup(
     license="MIT license",
     long_description=readme + "\n\n" + history,
     include_package_data=True,
-    keywords="sxm_player",
+    keywords="sxm,SiriusXM,XM Radio",
     name="sxm_player",
     packages=find_packages(
         include=["sxm_player", "sxm_player.*"], exclude=["*.debug"]
@@ -56,7 +57,7 @@ setup(
     test_suite="tests",
     tests_require=requirements["dev"],
     url="https://github.com/AngellusMortis/sxm-player",
-    version="0.1.0",
+    version="0.1.1",
     zip_safe=False,
     extras_require={"dev": requirements["dev"]},
 )
