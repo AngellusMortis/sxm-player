@@ -239,7 +239,11 @@ def handle_hls_stderror_lines_event(
 def handle_debug_start_player_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
-    """ event.msg == (player_name: str, channel_id: str, filename: str, stream_protocol: str) """
+    """ event.msg ==
+        (player_name: str,
+         channel_id: str,
+         filename: str,
+         stream_protocol: str) """
 
     player_name = event.msg[0]
     channel_id = event.msg[1]
