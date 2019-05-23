@@ -84,9 +84,9 @@ class Episode(Base):  # type: ignore
 
 
 class PlayerState:
-    COOLDOWN_SHORT = 30
-    COOLDOWN_MED = 300
-    COOLDOWN_LONG = 3600
+    COOLDOWN_SHORT = 10
+    COOLDOWN_MED = 60
+    COOLDOWN_LONG = 600
 
     stream_url: Optional[str] = None
     stream_channel: Optional[str] = None
@@ -102,6 +102,7 @@ class PlayerState:
     _live: Optional[XMLiveChannel] = None
     _failures: int = 0
     _cooldown: float = 0
+    _last_failure: float = 0
     _start_time: Optional[float] = None
     _time_offset: Optional[float] = None
 
@@ -213,7 +214,7 @@ class PlayerState:
     @property
     def is_connected(self) -> bool:
         is_connected = self._raw_channels is not None
-        if is_connected:
+        if is_connected and time.time() - self._last_failure > 300:
             self._failures = 0
         return is_connected
 
@@ -248,6 +249,7 @@ class PlayerState:
 
     def mark_failure(self) -> float:
         self._failures += 1
+        self._last_failure = time.time()
         return self._cooldown
 
     def get_channel(self, name: str) -> Union[XMChannel, None]:

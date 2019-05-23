@@ -14,6 +14,7 @@ class StatusWorker(SXMLoopedWorker):
     _ip: str
     _port: int
     _delay: float = 30.0
+    _failures: int = 0
 
     def __init__(self, port: int, ip: str, *args, **kwargs):
 
@@ -34,12 +35,18 @@ class StatusWorker(SXMLoopedWorker):
             r = requests.get(f"http://{self._ip}:{self._port}/channels/")
 
             if not r.ok:
-                self.push_event(
-                    EventMessage(
-                        self.name, Event.RESET_SXM, "bad status check"
+                # adjust delay to check more often
+                self._delay = 5.0
+                self._failures += 1
+                if self._failures > 3:
+                    self.push_event(
+                        EventMessage(
+                            self.name, Event.RESET_SXM, "bad status check"
+                        )
                     )
-                )
             else:
+                self._delay = 30.0
+                self._failures = 0
                 self.push_event(
                     EventMessage(self.name, Event.UPDATE_CHANNELS, r.json())
                 )

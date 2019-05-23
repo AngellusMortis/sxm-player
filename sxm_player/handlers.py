@@ -13,42 +13,66 @@ from .workers import (
 )
 
 
-def hls_start_event(runner: Runner, stream_data: tuple):
-    hls_event(runner, Event.HLS_STREAM_STARTED, stream_data)
+def hls_start_event(
+    runner: Runner, stream_data: tuple, src: Optional[str] = None
+):
+    hls_event(runner, Event.HLS_STREAM_STARTED, stream_data, src=src)
 
 
-def hls_kill_event(runner: Runner):
-    hls_event(runner, Event.KILL_HLS_STREAM, None)
+def hls_kill_event(runner: Runner, src: Optional[str] = None):
+    hls_event(runner, Event.KILL_HLS_STREAM, None, src=src)
 
 
-def hls_metadata_event(runner: Runner, live_data: tuple):
-    hls_event(runner, Event.UPDATE_METADATA, live_data)
+def hls_metadata_event(
+    runner: Runner, live_data: tuple, src: Optional[str] = None
+):
+    hls_event(runner, Event.UPDATE_METADATA, live_data, src=src)
 
 
-def hls_channels_event(runner: Runner, channels: Optional[list]):
-    hls_event(runner, Event.UPDATE_CHANNELS, channels)
+def hls_channels_event(
+    runner: Runner, channels: Optional[list], src: Optional[str] = None
+):
+    hls_event(runner, Event.UPDATE_CHANNELS, channels, src=src)
 
 
-def hls_event(runner: Runner, event: Event, data):
+def hls_event(runner: Runner, event: Event, data, src: Optional[str] = None):
     for worker in runner.workers.values():
         if worker.hls_stream_queue is not None:
-            push_event(
-                runner,
-                worker,
-                "hls_stream_queue",
-                EventMessage("main", event, data),
-            )
+            if src is None:
+                push_event(
+                    runner,
+                    worker,
+                    "hls_stream_queue",
+                    EventMessage("main", event, data),
+                )
+            else:
+                push_event(
+                    runner,
+                    worker,
+                    "hls_stream_queue",
+                    EventMessage(src, event, data, msg_relay="main"),
+                )
 
 
-def sxm_status_event(runner: Runner, event: Event, status: bool):
+def sxm_status_event(
+    runner: Runner, event: Event, status: bool, src: Optional[str] = None
+):
     for worker in runner.workers.values():
         if worker.sxm_status_queue is not None:
-            push_event(
-                runner,
-                worker,
-                "sxm_status_queue",
-                EventMessage("main", event, status),
-            )
+            if src is None:
+                push_event(
+                    runner,
+                    worker,
+                    "sxm_status_queue",
+                    EventMessage("main", event, status),
+                )
+            else:
+                push_event(
+                    runner,
+                    worker,
+                    "sxm_status_queue",
+                    EventMessage(src, event, status, msg_relay="main"),
+                )
 
 
 def push_event(
@@ -68,7 +92,7 @@ def handle_update_channels_event(
 
     state.channels = event.msg
 
-    hls_channels_event(runner, state.get_raw_channels())
+    hls_channels_event(runner, state.get_raw_channels(), src=event.msg_src)
 
 
 def handle_reset_sxm_event(
@@ -117,7 +141,7 @@ def handle_trigger_hls_stream_event(
                 src_worker,
                 "hls_stream_queue",
                 EventMessage(
-                    "main", Event.HLS_STREAM_STARTED, state.stream_data
+                    event.msg_src, Event.HLS_STREAM_STARTED, state.stream_data
                 ),
             )
             runner.log.info(
@@ -156,7 +180,7 @@ def handle_kill_hls_stream_event(
 
     state.stream_data = (None, None)
 
-    hls_kill_event(runner)
+    hls_kill_event(runner, src=event.msg_src)
     for worker_name in (
         HLSWorker.NAME,
         ArchiveWorker.NAME,
@@ -190,7 +214,7 @@ def handle_hls_stream_started_event(
         processed_folder = os.path.join(output_folder, "processed")
 
     state.stream_data = event.msg
-    hls_start_event(runner, state.stream_data)
+    hls_start_event(runner, state.stream_data, src=event.msg_src)
 
     if output_folder is not None:
         runner.create_worker(
@@ -222,7 +246,7 @@ def handle_update_metadata_event(
 
     state.stream_channel = event.msg["channelId"]
     state.live = event.msg
-    hls_metadata_event(runner, state.get_raw_live())
+    hls_metadata_event(runner, state.get_raw_live(), src=event.msg_src)
 
 
 def handle_hls_stderror_lines_event(

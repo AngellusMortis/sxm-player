@@ -24,12 +24,14 @@ class Event(Enum):
 class EventMessage:
     id: float
     msg_src: str
+    msg_relay: str
     msg_type: Event
     msg: Any
 
-    def __init__(self, msg_src, msg_type, msg):
+    def __init__(self, msg_src, msg_type, msg, msg_relay=None):
         self.id = time.time()
         self.msg_src = msg_src
+        self.msg_relay = msg_relay
         self.msg_type = msg_type
         self.msg = msg
 

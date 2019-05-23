@@ -18,7 +18,7 @@ from .status import StatusWorker
 
 # debug.py is not included in published package
 try:
-    from .debug import DebugWorker
+    from ..debug.worker import DebugWorker
 except ImportError:
     DebugWorker = None  # type: ignore
 
