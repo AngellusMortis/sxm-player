@@ -25,7 +25,7 @@ class Song(Base):  # type: ignore
 
     @staticmethod
     def get_pretty_name(title: str, artist: str, bold: bool = False) -> str:
-        """ Returns a formatted name of song """
+        """Returns a formatted name of song"""
 
         mod = ""
         if bold:
@@ -35,13 +35,13 @@ class Song(Base):  # type: ignore
 
     @property
     def pretty_name(self) -> str:
-        """ Returns a formatted name of song """
+        """Returns a formatted name of song"""
 
         return Song.get_pretty_name(self.title, self.artist)
 
     @property
     def bold_name(self) -> str:
-        """ Returns a formatted name of song """
+        """Returns a formatted name of song"""
 
         return Song.get_pretty_name(self.title, self.artist, True)
 
@@ -60,7 +60,7 @@ class Episode(Base):  # type: ignore
     def get_pretty_name(
         title: str, show: str, air_time: datetime, bold: bool = False
     ) -> str:
-        """ Returns a formatted name of show """
+        """Returns a formatted name of show"""
 
         mod = ""
         if bold:
@@ -70,17 +70,15 @@ class Episode(Base):  # type: ignore
 
     @property
     def pretty_name(self) -> str:
-        """ Returns a formatted name of show """
+        """Returns a formatted name of show"""
 
         return Episode.get_pretty_name(self.title, self.show, self.air_time)
 
     @property
     def bold_name(self) -> str:
-        """ Returns a formatted name of show """
+        """Returns a formatted name of show"""
 
-        return Episode.get_pretty_name(
-            self.title, self.show, self.air_time, True
-        )
+        return Episode.get_pretty_name(self.title, self.show, self.air_time, True)
 
 
 class PlayerState:
@@ -117,7 +115,7 @@ class PlayerState:
 
     @property
     def channels(self) -> List[XMChannel]:
-        """ Returns list of `XMChannel` """
+        """Returns list of `XMChannel`"""
 
         if self._channels is None:
             if self._raw_channels is None:
@@ -129,7 +127,7 @@ class PlayerState:
 
     @channels.setter
     def channels(self, value: Optional[List[dict]]) -> None:
-        """ Sets channel key in internal `_raw_channels`. """
+        """Sets channel key in internal `_raw_channels`."""
 
         self._channels = None
         self._raw_channels = value
@@ -151,17 +149,16 @@ class PlayerState:
 
     @property
     def live(self) -> Union[XMLiveChannel, None]:
-        """ Returns current `XMLiveChannel` """
+        """Returns current `XMLiveChannel`"""
 
         return self._live
 
     @live.setter
     def live(self, value: dict) -> None:
-        """ Sets live key in internal `_raw_live`. """
+        """Sets live key in internal `_raw_live`."""
 
         now = int(time.time() * 1000)
         self._live = None
-        self._start_time = None
         self._raw_live = value
 
         if self._raw_live is not None:
@@ -177,9 +174,10 @@ class PlayerState:
                     self._start_time = self._live.tune_time
         else:
             self._time_offset = 0
+            self._start_time = None
 
     def get_raw_live(
-        self
+        self,
     ) -> Tuple[Optional[float], Optional[float], Optional[dict]]:
         return (self._start_time, self._time_offset, self._raw_live)
 
@@ -196,7 +194,7 @@ class PlayerState:
 
     @property
     def radio_time(self) -> Union[int, None]:
-        """ Returns current time for the radio """
+        """Returns current time for the radio"""
 
         if self.live is None:
             return None
@@ -205,7 +203,7 @@ class PlayerState:
 
     @property
     def start_time(self) -> Union[float, None]:
-        """ Returns the start time for the current SiriusXM channel """
+        """Returns the start time for the current SiriusXM channel"""
 
         if self.live is None:
             return None
@@ -228,8 +226,7 @@ class PlayerState:
             extra_seconds = self.increase_cooldown()
 
             logger.info(
-                "Attempting to connect SXM Client (next in "
-                f"{extra_seconds} seconds)"
+                "Attempting to connect SXM Client (next in " f"{extra_seconds} seconds)"
             )
             return True
         return False
@@ -253,7 +250,7 @@ class PlayerState:
         return self._cooldown
 
     def get_channel(self, name: str) -> Union[XMChannel, None]:
-        """ Returns channel from list of `channels` with given name """
+        """Returns channel from list of `channels` with given name"""
 
         name = name.lower()
         for channel in self.channels:

@@ -8,7 +8,7 @@ __all__ = ["DebugWorker"]
 
 
 class DebugWorker(InterruptableWorker):
-    """ DebugWorker to be used for development """
+    """DebugWorker to be used for development"""
 
     _num: int = 0
 
@@ -38,18 +38,14 @@ class DebugWorker(InterruptableWorker):
         )
 
     def stop_player(self, player_name, kill_hls=True):
-        self.push_event(
-            EventMessage(self.name, Event.DEBUG_STOP_PLAYER, player_name)
-        )
+        self.push_event(EventMessage(self.name, Event.DEBUG_STOP_PLAYER, player_name))
 
         if kill_hls:
             self.kill_hls()
 
     def trigger_hls(self, channel_id, protocol="udp"):
         self.push_event(
-            EventMessage(
-                self.name, Event.TRIGGER_HLS_STREAM, (channel_id, protocol)
-            )
+            EventMessage(self.name, Event.TRIGGER_HLS_STREAM, (channel_id, protocol))
         )
 
     def kill_hls(self):

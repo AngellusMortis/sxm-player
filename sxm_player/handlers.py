@@ -13,9 +13,7 @@ from .workers import (
 )
 
 
-def hls_start_event(
-    runner: Runner, stream_data: tuple, src: Optional[str] = None
-):
+def hls_start_event(runner: Runner, stream_data: tuple, src: Optional[str] = None):
     hls_event(runner, Event.HLS_STREAM_STARTED, stream_data, src=src)
 
 
@@ -23,9 +21,7 @@ def hls_kill_event(runner: Runner, src: Optional[str] = None):
     hls_event(runner, Event.KILL_HLS_STREAM, None, src=src)
 
 
-def hls_metadata_event(
-    runner: Runner, live_data: tuple, src: Optional[str] = None
-):
+def hls_metadata_event(runner: Runner, live_data: tuple, src: Optional[str] = None):
     hls_event(runner, Event.UPDATE_METADATA, live_data, src=src)
 
 
@@ -75,9 +71,7 @@ def sxm_status_event(
                 )
 
 
-def push_event(
-    runner: Runner, worker: Worker, queue_name: str, event: EventMessage
-):
+def push_event(runner: Runner, worker: Worker, queue_name: str, event: EventMessage):
 
     success = getattr(worker, queue_name).safe_put(event)
 
@@ -88,7 +82,7 @@ def push_event(
 def handle_update_channels_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
-    """ event.msg == `PlayerState.get_raw_channels()` """
+    """event.msg == `PlayerState.get_raw_channels()`"""
 
     state.channels = event.msg
 
@@ -98,7 +92,7 @@ def handle_update_channels_event(
 def handle_reset_sxm_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
-    """ event.msg == None """
+    """event.msg == None"""
 
     sxm_worker = runner.workers.get(ServerWorker.NAME)
     if sxm_worker is not None:
@@ -107,8 +101,7 @@ def handle_reset_sxm_event(
         cooldown = state.increase_cooldown()
 
         runner.log.warning(
-            "SXM Client acting up, restarting it (cooldown: "
-            f"{cooldown} seconds)"
+            "SXM Client acting up, restarting it (cooldown: " f"{cooldown} seconds)"
         )
 
         del runner.workers[ServerWorker.NAME]
@@ -126,7 +119,7 @@ def handle_trigger_hls_stream_event(
     output_folder: str,
     **kwargs,
 ):
-    """ event.msg == (channel_name: str, stream_protocol: str) """
+    """event.msg == (channel_name: str, stream_protocol: str)"""
 
     hls_worker = runner.workers.get(HLSWorker.NAME)
     stream_folder: Optional[str] = None
@@ -168,15 +161,14 @@ def handle_trigger_hls_stream_event(
         state.stream_channel = event.msg
     else:
         runner.log.warning(
-            f"Could not start new {HLSWorker.NAME}, invalid "
-            f"channel id: {event.msg}"
+            f"Could not start new {HLSWorker.NAME}, invalid " f"channel id: {event.msg}"
         )
 
 
 def handle_kill_hls_stream_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
-    """ event.msg == None """
+    """event.msg == None"""
 
     state.stream_data = (None, None)
 
@@ -203,7 +195,7 @@ def handle_hls_stream_started_event(
     reset_songs: bool,
     **kwargs,
 ):
-    """ event.msg == (channel_name: str, stream_url: str) """
+    """event.msg == (channel_name: str, stream_url: str)"""
 
     stream_folder: Optional[str] = None
     archive_folder: Optional[str] = None
@@ -242,7 +234,7 @@ def handle_hls_stream_started_event(
 def handle_update_metadata_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
-    """ event.msg == (state.get_raw_live()) """
+    """event.msg == (state.get_raw_live())"""
 
     state.stream_channel = event.msg["channelId"]
     state.live = event.msg
@@ -252,7 +244,7 @@ def handle_update_metadata_event(
 def handle_hls_stderror_lines_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
-    """ event.msg == lines: List[str] """
+    """event.msg == lines: List[str]"""
 
     do_reset = False
     for line in event.msg:
@@ -268,24 +260,20 @@ def handle_hls_stderror_lines_event(
 def handle_debug_start_player_event(
     event: EventMessage, runner: Runner, state: PlayerState, **kwargs
 ):
-    """ event.msg ==
-        (player_name: str,
-         channel_id: str,
-         filename: str,
-         stream_protocol: str) """
+    """event.msg ==
+    (player_name: str,
+     channel_id: str,
+     filename: str,
+     stream_protocol: str)"""
 
     player_name = event.msg[0]
     channel_id = event.msg[1]
     filename = event.msg[2]
     stream_protocol = event.msg[3]
 
-    if (
-        state.stream_channel is not None
-        and channel_id not in state.stream_channel
-    ):
+    if state.stream_channel is not None and channel_id not in state.stream_channel:
         runner.log.warning(
-            "Cannot start player, different HLS stream "
-            f"playing: {state.stream_url}"
+            "Cannot start player, different HLS stream " f"playing: {state.stream_url}"
         )
     else:
         runner.create_worker(
@@ -300,15 +288,11 @@ def handle_debug_start_player_event(
         )
 
 
-def handle_debug_stop_player_event(
-    event: EventMessage, runner: Runner, **kwargs
-):
-    """ event.msg == player_name: str """
+def handle_debug_stop_player_event(event: EventMessage, runner: Runner, **kwargs):
+    """event.msg == player_name: str"""
 
     worker = runner.workers.get(event.msg)
     if worker is None:
-        runner.log.warning(
-            f"Debug Player {event.msg} is not currently running"
-        )
+        runner.log.warning(f"Debug Player {event.msg} is not currently running")
     else:
         worker.full_stop()

@@ -38,7 +38,5 @@ def init_signal(signal_num, signal_object, exception_class, handler):
 def init_signals(shutdown_event, int_handler, term_handler):
     signal_object = SignalObject(shutdown_event)
     init_signal(signal.SIGINT, signal_object, KeyboardInterrupt, int_handler)
-    init_signal(
-        signal.SIGTERM, signal_object, TerminateInterrupt, term_handler
-    )
+    init_signal(signal.SIGTERM, signal_object, TerminateInterrupt, term_handler)
     return signal_object

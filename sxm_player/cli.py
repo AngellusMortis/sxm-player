@@ -75,13 +75,9 @@ from .workers import ServerWorker, StatusWorker
     envvar="MUSIC_OUTPUT_FOLDER",
     help="output folder to save stream off to as it plays them",
 )
-@click.option(
-    "-r", "--reset-songs", is_flag=True, help="reset processed song database"
-)
+@click.option("-r", "--reset-songs", is_flag=True, help="reset processed song database")
 # Player paramaters
-@click.argument(
-    "player_class", type=PlayerClass(), required=False, default=None
-)
+@click.argument("player_class", type=PlayerClass(), required=False, default=None)
 def main(
     config_file: str,
     log_file: str,
@@ -118,9 +114,7 @@ def main(
             worker_args = player_class.get_worker_args(**locals())
             if worker_args is not None:
                 state.player_name = worker_args[1]
-                runner.create_worker(
-                    worker_args[0], worker_args[1], **(worker_args[2])
-                )
+                runner.create_worker(worker_args[0], worker_args[1], **(worker_args[2]))
 
         while not runner.shutdown_event.is_set():  # type: ignore
             event_loop(**locals())
@@ -173,9 +167,7 @@ def event_loop(runner: Runner, state: PlayerState, **kwargs):
             )
 
             state.sxm_running = True
-            handlers.sxm_status_event(
-                runner, Event.SXM_STATUS, state.sxm_running
-            )
+            handlers.sxm_status_event(runner, Event.SXM_STATUS, state.sxm_running)
 
     check_player(runner, state)
 
@@ -190,9 +182,7 @@ def handle_event(event: EventMessage, **kwargs):
     if hasattr(handlers, handler_name) and (not is_debug_event or debug):
         getattr(handlers, handler_name)(event, **kwargs)
     else:
-        runner.log.warning(
-            f"Unknown event received: {event.msg_src}, {event.msg_type}"
-        )
+        runner.log.warning(f"Unknown event received: {event.msg_src}, {event.msg_type}")
 
 
 def check_player(runner: Runner, state: PlayerState):

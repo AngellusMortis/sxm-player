@@ -71,8 +71,7 @@ class HLSWorker(SXMLoopedWorker, FFmpeg):
     ) -> Tuple[str, str]:
         if stream_protocol not in FFMPEG_PROTOCOLS:
             self._log.warning(
-                f"Unknown stream protocol: {stream_protocol}, "
-                "defaulting to udp"
+                f"Unknown stream protocol: {stream_protocol}, " "defaulting to udp"
             )
             stream_protocol = "udp"
 
@@ -87,9 +86,7 @@ class HLSWorker(SXMLoopedWorker, FFmpeg):
         #     playback_url = f"rtmp://127.0.0.1:{port}"
         #     output_options = f"-listen 1 {playback_url}"
         else:
-            socket_file = os.path.join(
-                tempfile.gettempdir(), f"{channel_id}.sock"
-            )
+            socket_file = os.path.join(tempfile.gettempdir(), f"{channel_id}.sock")
             if os.path.exists(socket_file):
                 os.remove(socket_file)
 
@@ -117,9 +114,7 @@ class HLSWorker(SXMLoopedWorker, FFmpeg):
             self.local_shutdown_event.set()
             return
         elif not self.check_process():
-            self._log.info(
-                f"ffmpeg process is not active, stopping {self.name}"
-            )
+            self._log.info(f"ffmpeg process is not active, stopping {self.name}")
             self.local_shutdown_event.set()
             return
         elif (
@@ -135,9 +130,7 @@ class HLSWorker(SXMLoopedWorker, FFmpeg):
 
         if len(lines) > 0:
             self._log.debug(f"adding {len(lines)} of stderr to shared memory")
-            self.push_event(
-                EventMessage(self.name, Event.HLS_STDERROR_LINES, lines)
-            )
+            self.push_event(EventMessage(self.name, Event.HLS_STDERROR_LINES, lines))
 
     def cleanup(self):
         self.stop_ffmpeg()

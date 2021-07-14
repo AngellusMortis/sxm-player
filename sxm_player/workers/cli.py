@@ -14,9 +14,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
 
     _event_cooldown: float = 0
 
-    def __init__(
-        self, filename: str, *args, stream_protocol: str = "udp", **kwargs
-    ):
+    def __init__(self, filename: str, *args, stream_protocol: str = "udp", **kwargs):
         super().__init__(*args, **kwargs)
 
         self.channel_id = self._state.stream_channel
@@ -35,9 +33,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
     def _valid_stream_loop(self):
         if self.process is None:
             if self._state.stream_url is not None:
-                self._log.info(
-                    f"Starting new HLS player: {self._state.stream_url}"
-                )
+                self._log.info(f"Starting new HLS player: {self._state.stream_url}")
                 self.command = FFMPEG_COMMAND.format(
                     self._state.stream_url, self.filename
                 )
@@ -46,9 +42,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
                 self._log.info(f"CLI Player start: {self.name}")
                 self.start_ffmpeg()
         elif not self.check_process():
-            self._log.info(
-                f"ffmpeg process is not active, removing ffmpeg process"
-            )
+            self._log.info(f"ffmpeg process is not active, removing ffmpeg process")
             self.cleanup()
         else:
             # read errors must be ran to prevent deadlock
@@ -60,9 +54,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
                 now = time.time()
                 if now > self._event_cooldown:
                     self._event_cooldown = now + 10
-                    self._log.info(
-                        f"Starting new HLS stream: {self.channel_id}"
-                    )
+                    self._log.info(f"Starting new HLS stream: {self.channel_id}")
                     self.push_event(
                         EventMessage(
                             self.name,

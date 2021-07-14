@@ -42,9 +42,7 @@ class ConfigCommandClass(click.Command):
 
         if player_param is not None:
             player_param.expose_value = False
-            player_class, _ = player_param.handle_parse_result(
-                context, options, []
-            )
+            player_class, _ = player_param.handle_parse_result(context, options, [])
             player_param.expose_value = True
         return player_class
 

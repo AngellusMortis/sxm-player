@@ -12,7 +12,7 @@ __all__ = ["ServerWorker"]
 
 
 class ServerWorker(InterruptableWorker):
-    """ SXM Client proxy server for sxm-player to interface with """
+    """SXM Client proxy server for sxm-player to interface with"""
 
     NAME = "sxm"
 
@@ -45,25 +45,21 @@ class ServerWorker(InterruptableWorker):
         self.sxm.authenticate()
 
     def _make_update_handler(self) -> Callable[[dict], None]:
-        """ Returns update handler to be called by
-        `SXMClient.get_playlist` when a HLS playlist updates """
+        """Returns update handler to be called by
+        `SXMClient.get_playlist` when a HLS playlist updates"""
 
         def update_handler(data: dict) -> None:
-            self.push_event(
-                EventMessage(self.name, Event.UPDATE_METADATA, data)
-            )
+            self.push_event(EventMessage(self.name, Event.UPDATE_METADATA, data))
 
         return update_handler
 
     def send_channel_list(self):
         channels = self.sxm.get_channels()
 
-        self.push_event(
-            EventMessage(self.name, Event.UPDATE_CHANNELS, channels)
-        )
+        self.push_event(EventMessage(self.name, Event.UPDATE_CHANNELS, channels))
 
     def run(self) -> None:
-        """ Runs SXM proxy server """
+        """Runs SXM proxy server"""
 
         self.send_channel_list()
 
@@ -71,14 +67,10 @@ class ServerWorker(InterruptableWorker):
 
         httpd = HTTPServer(
             (self._ip, self._port),
-            make_http_handler(
-                self.sxm, request_logger, request_level=logging.DEBUG
-            ),
+            make_http_handler(self.sxm, request_logger, request_level=logging.DEBUG),
         )
         try:
-            self._log.info(
-                f"{self.name} has started on http://{self._ip}:{self._port}"
-            )
+            self._log.info(f"{self.name} has started on http://{self._ip}:{self._port}")
             httpd.serve_forever()
         except (KeyboardInterrupt, TerminateInterrupt):
             pass

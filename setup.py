@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 
 
 def parse_requirements(filename):
-    """ load requirements from a pip requirements file """
+    """load requirements from a pip requirements file"""
     lines = (line.strip() for line in open(filename))
     return [line for line in lines if line and not line.startswith("#")]
 
@@ -50,9 +50,7 @@ setup(
     include_package_data=True,
     keywords="sxm,SiriusXM,XM Radio",
     name="sxm_player",
-    packages=find_packages(
-        include=["sxm_player", "sxm_player.*"], exclude=["*.debug"]
-    ),
+    packages=find_packages(include=["sxm_player", "sxm_player.*"], exclude=["*.debug"]),
     setup_requires=requirements["setup"],
     test_suite="tests",
     tests_require=requirements["dev"],

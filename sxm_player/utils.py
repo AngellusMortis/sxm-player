@@ -40,7 +40,7 @@ def init_db(
     cleanup: Optional[bool] = True,
     reset: Optional[bool] = False,
 ) -> Session:
-    """ Initializes song database connection """
+    """Initializes song database connection"""
 
     from .models import Base
 
@@ -75,8 +75,8 @@ def init_db(
 
 
 def get_air_time(cut: XMMarker) -> datetime.datetime:
-    """ Dates UTC datetime object for the air
-    date of a `XMMarker` to the hour """
+    """Dates UTC datetime object for the air
+    date of a `XMMarker` to the hour"""
 
     air_time = datetime.datetime.fromtimestamp(
         int(cut.time / 1000), tz=datetime.timezone.utc
@@ -87,7 +87,7 @@ def get_air_time(cut: XMMarker) -> datetime.datetime:
 
 
 def get_files(folder: str) -> List[str]:
-    """ Gets list of files in a folder """
+    """Gets list of files in a folder"""
 
     dir_list = os.listdir(folder)
 
@@ -103,11 +103,9 @@ def get_files(folder: str) -> List[str]:
 def splice_file(
     input_file: str, output_file: str, start_time: int, end_time: int
 ) -> Union[str, None]:
-    """ Splices a chunk off of the input file and saves it """
+    """Splices a chunk off of the input file and saves it"""
 
-    ffmpeg_command = (
-        'ffmpeg -y -i "{}" -acodec copy -ss {} -to {} -loglevel fatal "{}"'
-    )
+    ffmpeg_command = 'ffmpeg -y -i "{}" -acodec copy -ss {} -to {} -loglevel fatal "{}"'
     args = shlex.split(
         ffmpeg_command.format(input_file, start_time, end_time, output_file)
     )
@@ -150,9 +148,7 @@ class FFmpeg:
     def start_ffmpeg(self) -> None:
         ffmpeg_args = shlex.split(self.command)
 
-        self.process = subprocess.Popen(  # nosec
-            ffmpeg_args, stderr=subprocess.PIPE
-        )
+        self.process = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)  # nosec
 
         self._stderr_poll = select.poll()  # pylint: disable=E1101
         self._stderr_poll.register(

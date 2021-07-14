@@ -15,7 +15,7 @@ MAX_DUPLICATE_COUNT = 3
 
 
 class ProcessorWorker(HLSLoopedWorker):
-    """ Runs song/show processor """
+    """Runs song/show processor"""
 
     NAME = "processor"
 
@@ -52,9 +52,7 @@ class ProcessorWorker(HLSLoopedWorker):
         ):
             return None
 
-        channel_archive = os.path.join(
-            self.archive_folder, self._state.stream_channel
-        )
+        channel_archive = os.path.join(self.archive_folder, self._state.stream_channel)
         os.makedirs(channel_archive, exist_ok=True)
 
         archives = {}
@@ -69,13 +67,11 @@ class ProcessorWorker(HLSLoopedWorker):
 
         processed_shows = self._process_cuts(archives, is_song=False)
 
-        self._log.info(
-            f"processed: {processed_songs} songs, {processed_shows} shows"
-        )
+        self._log.info(f"processed: {processed_songs} songs, {processed_shows} shows")
 
     def _path_filter(self, word: str) -> str:
-        """ Filters out known words to call issues for creating
-        names for folders/files """
+        """Filters out known words to call issues for creating
+        names for folders/files"""
 
         return (
             word.replace("Counterfeit.", "Counterfeit")
@@ -92,8 +88,8 @@ class ProcessorWorker(HLSLoopedWorker):
     def _process_cut(
         self, archives: Dict[str, str], cut: XMMarker, is_song: bool = True
     ) -> bool:
-        """ Processes `archives` to splice out an
-            instance of `XMMarker` if it exists """
+        """Processes `archives` to splice out an
+        instance of `XMMarker` if it exists"""
 
         if (
             self.processed_folder is None
@@ -108,9 +104,7 @@ class ProcessorWorker(HLSLoopedWorker):
         end = start + padded_duration
 
         for archive_key, archive_file in archives.items():
-            archive_start, archive_end = [
-                int(i) for i in archive_key.split(".")
-            ]
+            archive_start, archive_end = [int(i) for i in archive_key.split(".")]
 
             if archive_start < start and archive_end > end:
                 archive = archive_file
@@ -125,9 +119,7 @@ class ProcessorWorker(HLSLoopedWorker):
             album_or_show = None
             artist = None
             filename = None
-            folder = os.path.join(
-                self.processed_folder, self._state.stream_channel
-            )
+            folder = os.path.join(self.processed_folder, self._state.stream_channel)
 
             air_time = get_air_time(cut)
 
@@ -135,10 +127,7 @@ class ProcessorWorker(HLSLoopedWorker):
                 title = self._path_filter(cut.cut.title)
                 artist = self._path_filter(cut.cut.artists[0].name)
 
-                if (
-                    cut.cut.album is not None
-                    and cut.cut.album.title is not None
-                ):
+                if cut.cut.album is not None and cut.cut.album.title is not None:
                     album_or_show = self._path_filter(cut.cut.album.title)
 
                 filename = f"{title}.{cut.guid}.mp3"
@@ -150,13 +139,11 @@ class ProcessorWorker(HLSLoopedWorker):
 
                 if cut.episode.show is not None:
                     album_or_show = self._path_filter(
-                        cut.episode.show.long_title
-                        or cut.episode.show.medium_title
+                        cut.episode.show.long_title or cut.episode.show.medium_title
                     )
 
                 filename = (
-                    f'{title}.{air_time.strftime("%Y-%m-%d-%H.%M")}'
-                    f".{cut.guid}.mp3"
+                    f'{title}.{air_time.strftime("%Y-%m-%d-%H.%M")}' f".{cut.guid}.mp3"
                 )
                 folder = os.path.join(folder, "shows")
 
@@ -204,11 +191,9 @@ class ProcessorWorker(HLSLoopedWorker):
                 return True
         return False
 
-    def _process_cuts(
-        self, archives: Dict[str, str], is_song: bool = True
-    ) -> int:
-        """ Processes `archives` to splice out any
-            instance of `XMMarker` if it exists """
+    def _process_cuts(self, archives: Dict[str, str], is_song: bool = True) -> int:
+        """Processes `archives` to splice out any
+        instance of `XMMarker` if it exists"""
 
         if self._state.live is None or self._state.db is None:
             return 0
@@ -227,24 +212,16 @@ class ProcessorWorker(HLSLoopedWorker):
             if is_song:
                 existing = (
                     self._state.db.query(Song)
-                    .filter_by(
-                        title=cut.cut.title, artist=cut.cut.artists[0].name
-                    )
+                    .filter_by(title=cut.cut.title, artist=cut.cut.artists[0].name)
                     .all()
                 )
 
                 if len(existing) >= MAX_DUPLICATE_COUNT:
                     continue
 
-                db_item = (
-                    self._state.db.query(Song).filter_by(guid=cut.guid).first()
-                )
+                db_item = self._state.db.query(Song).filter_by(guid=cut.guid).first()
             else:
-                db_item = (
-                    self._state.db.query(Episode)
-                    .filter_by(guid=cut.guid)
-                    .first()
-                )
+                db_item = self._state.db.query(Episode).filter_by(guid=cut.guid).first()
 
             if db_item is not None:
                 continue
@@ -256,9 +233,7 @@ class ProcessorWorker(HLSLoopedWorker):
                 title = cut.episode.long_title or cut.episode.medium_title
 
             self._log.debug(
-                f"processing {title}: "
-                f"{cut.time}: {cut.duration}"
-                f"{cut.guid}"
+                f"processing {title}: " f"{cut.time}: {cut.duration}" f"{cut.guid}"
             )
             success = self._process_cut(archives, cut, is_song)
 

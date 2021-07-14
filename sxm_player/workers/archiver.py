@@ -22,9 +22,7 @@ class ArchiveWorker(HLSLoopedWorker):
 
     _delay: float = ARCHIVE_CHUNK
 
-    def __init__(
-        self, stream_folder: str, archive_folder: str, *args, **kwargs
-    ):
+    def __init__(self, stream_folder: str, archive_folder: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # run in 11 minutes (ARCHIVE_CHUNK + 1 minute) to ensure a
@@ -52,8 +50,7 @@ class ArchiveWorker(HLSLoopedWorker):
             deleted += removed
 
         self._log.info(
-            f"archived: deleted files: {deleted}, "
-            f"archived file: {archived}"
+            f"archived: deleted files: {deleted}, " f"archived file: {archived}"
         )
 
     def _process_file(self, abs_path) -> Tuple[Optional[str], int]:
@@ -71,10 +68,7 @@ class ArchiveWorker(HLSLoopedWorker):
     def _validate_name(self, stream_file) -> bool:
         stream_file = os.path.basename(stream_file)
         file_parts = stream_file.split(".")
-        if (
-            file_parts[-1] != "mp3"
-            or file_parts[0] != self._state.stream_channel
-        ):
+        if file_parts[-1] != "mp3" or file_parts[0] != self._state.stream_channel:
             os.remove(stream_file)
             return False
         return True
@@ -82,9 +76,7 @@ class ArchiveWorker(HLSLoopedWorker):
     def _validate_size(self, stream_file) -> bool:
         if not self._check_size(stream_file):
             self._log.error("archive not increasing, resetting channel")
-            self.push_event(
-                EventMessage(self.name, Event.KILL_HLS_STREAM, None)
-            )
+            self.push_event(EventMessage(self.name, Event.KILL_HLS_STREAM, None))
             return False
         return True
 
@@ -102,7 +94,7 @@ class ArchiveWorker(HLSLoopedWorker):
     def _delete_old_archives(
         self, archive_folder: str, archive_base: str, current_file: str
     ) -> int:
-        """ Deletes any old versions of archive that is about to be made """
+        """Deletes any old versions of archive that is about to be made"""
 
         archive_files = get_files(archive_folder)
 
@@ -112,8 +104,7 @@ class ArchiveWorker(HLSLoopedWorker):
             abs_path = os.path.join(archive_folder, archive_file)
             age: float = now - os.path.getatime(abs_path)
             if (
-                archive_file.startswith(archive_base)
-                and archive_file != current_file
+                archive_file.startswith(archive_base) and archive_file != current_file
             ) or age > ARCHIVE_DROPOFF:
 
                 self._log.debug(f"deleted old archive: {abs_path}")
@@ -121,11 +112,9 @@ class ArchiveWorker(HLSLoopedWorker):
                 removed += 1
         return removed
 
-    def _process_stream_file(
-        self, abs_path: str
-    ) -> Tuple[Union[str, None], int]:
-        """ Processes stream file by creating an archive from
-        it if necessary """
+    def _process_stream_file(self, abs_path: str) -> Tuple[Union[str, None], int]:
+        """Processes stream file by creating an archive from
+        it if necessary"""
 
         channel_id = self._state.stream_channel
         if channel_id is None or self.archive_folder is None:

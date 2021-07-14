@@ -40,9 +40,7 @@ class StatusWorker(SXMLoopedWorker):
                 self._failures += 1
                 if self._failures > 3:
                     self.push_event(
-                        EventMessage(
-                            self.name, Event.RESET_SXM, "bad status check"
-                        )
+                        EventMessage(self.name, Event.RESET_SXM, "bad status check")
                     )
             else:
                 self._delay = 30.0

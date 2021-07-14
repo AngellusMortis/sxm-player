@@ -231,10 +231,7 @@ class Runner:
             exitcode = worker.process.exitcode
             if exitcode:
                 self.log.error(
-                    (
-                        f"Process {worker.name} ended with "
-                        f"exitcode {exitcode}"
-                    )
+                    (f"Process {worker.name} ended with " f"exitcode {exitcode}")
                 )
                 terminated = 2
             else:

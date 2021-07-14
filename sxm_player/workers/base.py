@@ -72,9 +72,7 @@ class BaseWorker:
         success = self.event_queue.safe_put(event)
 
         if not success:
-            self._log.error(
-                f"Could not pass event: {event.msg_src}, {event.msg_type}"
-            )
+            self._log.error(f"Could not pass event: {event.msg_src}, {event.msg_type}")
 
 
 class InterruptableWorker(BaseWorker):
@@ -181,9 +179,11 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
         self,
         stream_data: Tuple[Optional[str], Optional[str]] = (None, None),
         channels: Optional[List[dict]] = None,
-        raw_live_data: Tuple[
-            Optional[float], Optional[float], Optional[dict]
-        ] = (None, None, None),
+        raw_live_data: Tuple[Optional[float], Optional[float], Optional[dict]] = (
+            None,
+            None,
+            None,
+        ),
         *args,
         **kwargs,
     ):
@@ -213,9 +213,7 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
             )
 
 
-class ComboLoopedWorker(
-    EventedWorker, SXMStatusSubscriber, HLSStatusSubscriber
-):
+class ComboLoopedWorker(EventedWorker, SXMStatusSubscriber, HLSStatusSubscriber):
     _state: PlayerState
 
     def __init__(
