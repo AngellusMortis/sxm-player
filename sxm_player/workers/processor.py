@@ -5,7 +5,13 @@ import time
 from sxm.models import XMMarker
 
 from ..models import Episode, Song
-from ..utils import get_air_time, get_files, splice_file
+from ..utils import (
+    get_air_time,
+    get_files,
+    splice_file,
+    get_art_url_by_size,
+    get_art_thumb_url,
+)
 from .archiver import ARCHIVE_CHUNK
 from .base import HLSLoopedWorker
 
@@ -117,6 +123,7 @@ class ProcessorWorker(HLSLoopedWorker):
 
             title = None
             album_or_show = None
+            album_url = None
             artist = None
             filename = None
             folder = os.path.join(self.processed_folder, self._state.stream_channel)
@@ -129,6 +136,7 @@ class ProcessorWorker(HLSLoopedWorker):
 
                 if cut.cut.album is not None and cut.cut.album.title is not None:
                     album_or_show = self._path_filter(cut.cut.album.title)
+                    album_url = get_art_url_by_size(cut.cut.album.arts, "MEDIUM")
 
                 filename = f"{title}.{cut.guid}.mp3"
                 folder = os.path.join(folder, "songs", artist)
@@ -141,6 +149,7 @@ class ProcessorWorker(HLSLoopedWorker):
                     album_or_show = self._path_filter(
                         cut.episode.show.long_title or cut.episode.show.medium_title
                     )
+                    album_url = get_art_thumb_url(cut.episode.show.arts)
 
                 filename = (
                     f'{title}.{air_time.strftime("%Y-%m-%d-%H.%M")}' f".{cut.guid}.mp3"
@@ -174,6 +183,7 @@ class ProcessorWorker(HLSLoopedWorker):
                         air_time=air_time,
                         channel=self._state.stream_channel,
                         file_path=path,
+                        image_url=album_url,
                     )
                 else:
                     db_item = Episode(
@@ -183,6 +193,7 @@ class ProcessorWorker(HLSLoopedWorker):
                         air_time=air_time,
                         channel=self._state.stream_channel,
                         file_path=path,
+                        image_url=album_url,
                     )
 
                 self._state.db.add(db_item)

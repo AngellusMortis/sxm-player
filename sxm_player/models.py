@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple, Union
 
 from sqlalchemy import Column, DateTime, String
@@ -22,6 +22,11 @@ class Song(Base):  # type: ignore
     air_time: datetime = Column(DateTime)
     channel: str = Column(String)
     file_path: str = Column(String)
+    image_url: str = Column(String, nullable=True)
+
+    @property
+    def air_time_smart(self):
+        return self.air_time.replace(tzinfo=timezone.utc)
 
     @staticmethod
     def get_pretty_name(title: str, artist: str, bold: bool = False) -> str:
@@ -55,6 +60,7 @@ class Episode(Base):  # type: ignore
     air_time: datetime = Column(DateTime)
     channel: str = Column(String)
     file_path: str = Column(String)
+    image_url: str = Column(String, nullable=True)
 
     @staticmethod
     def get_pretty_name(

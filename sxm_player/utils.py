@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
 
-from sxm.models import XMMarker
+from sxm.models import XMMarker, XMArt, XMImage
 
 from .models import Episode, Song
 
@@ -84,6 +84,29 @@ def get_air_time(cut: XMMarker) -> datetime.datetime:
     air_time = air_time.replace(minute=0, second=0, microsecond=0)
 
     return air_time
+
+
+def get_art_url_by_size(arts: List[XMArt], size: str) -> Optional[str]:
+    for art in arts:
+        if isinstance(art, XMImage) and art.size is not None and art.size == size:
+            return art.url
+    return None
+
+
+def get_art_thumb_url(arts: List[XMArt]) -> Optional[str]:
+    thumb: Optional[str] = None
+
+    for art in arts:
+        if art.height > 100 and art.height < 200 and art.height == art.width:
+            # logo on dark is what we really want
+            if art.name == "show logo on dark":
+                thumb = art.url
+                break
+            # but it is not always there, so fallback image
+            elif art.name == "image":
+                thumb = art.url
+
+    return thumb
 
 
 def get_files(folder: str) -> List[str]:
