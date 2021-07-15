@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
 from sxm.models import XMArt, XMImage, XMMarker
 
-from sxm_player.models import Episode, Song
+from sxm_player.models import DBEpisode, DBSong
 
 ACTIVE_PROCESS_STATUSES = [
     psutil.STATUS_RUNNING,
@@ -48,6 +48,7 @@ def init_db(
     song_db = os.path.join(base_folder, "songs.db")
 
     if reset and os.path.exists(song_db):
+        logger.info("Reseting database...")
         os.remove(song_db)
 
     db_engine = create_engine(f"sqlite:///{song_db}")
@@ -56,12 +57,12 @@ def init_db(
 
     if cleanup:
         removed = 0
-        for song in db_session.query(Song).all():
+        for song in db_session.query(DBSong).all():
             if not os.path.exists(song.file_path):
                 removed += 1
                 db_session.delete(song)
 
-        for show in db_session.query(Episode).all():
+        for show in db_session.query(DBEpisode).all():
             if not os.path.exists(show.file_path):
                 removed += 1
                 db_session.delete(show)
@@ -70,6 +71,7 @@ def init_db(
             logger.warn(f"deleted missing songs/shows: {removed}")
             db_session.commit()
 
+    logger.info("Database initalized")
     return db_session
 
 

@@ -193,7 +193,12 @@ py==1.10.0
 pycodestyle==2.7.0
     # via flake8
 pydantic==1.8.2
-    # via sxm
+    # via
+    #   pydantic-sqlalchemy
+    #   sxm
+    #   sxm_player (pyproject.toml)
+pydantic-sqlalchemy==0.0.9
+    # via sxm_player (pyproject.toml)
 pyflakes==2.3.1
     # via flake8
 pygments==2.9.0
@@ -283,7 +288,9 @@ sphinxcontrib-qthelp==1.0.3
 sphinxcontrib-serializinghtml==1.1.5
     # via sphinx
 sqlalchemy==1.4.21
-    # via sxm_player (pyproject.toml)
+    # via
+    #   pydantic-sqlalchemy
+    #   sxm_player (pyproject.toml)
 sqlalchemy-stubs==0.4
     # via sxm_player (pyproject.toml)
 stevedore==3.3.0

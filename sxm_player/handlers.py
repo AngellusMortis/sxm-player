@@ -84,7 +84,7 @@ def handle_update_channels_event(
 ):
     """event.msg == `PlayerState.get_raw_channels()`"""
 
-    state.channels = event.msg
+    state.update_channels(event.msg)
 
     hls_channels_event(runner, state.get_raw_channels(), src=event.msg_src)
 
@@ -97,7 +97,7 @@ def handle_reset_sxm_event(
     sxm_worker = runner.workers.get(ServerWorker.NAME)
     if sxm_worker is not None:
         sxm_worker.terminate()
-        state.channels = None  # type: ignore
+        state.update_channels(None)
         cooldown = state.increase_cooldown()
 
         runner.log.warning(
@@ -170,7 +170,7 @@ def handle_kill_hls_stream_event(
 ):
     """event.msg == None"""
 
-    state.stream_data = (None, None)
+    state.update_stream_data((None, None))
 
     hls_kill_event(runner, src=event.msg_src)
     for worker_name in (
@@ -205,7 +205,7 @@ def handle_hls_stream_started_event(
         archive_folder = os.path.join(output_folder, "archive")
         processed_folder = os.path.join(output_folder, "processed")
 
-    state.stream_data = event.msg
+    state.update_stream_data(event.msg)
     hls_start_event(runner, state.stream_data, src=event.msg_src)
 
     if output_folder is not None:
@@ -237,7 +237,7 @@ def handle_update_metadata_event(
     """event.msg == (state.get_raw_live())"""
 
     state.stream_channel = event.msg["channelId"]
-    state.live = event.msg
+    state.update_live(event.msg)
     hls_metadata_event(runner, state.get_raw_live(), src=event.msg_src)
 
 

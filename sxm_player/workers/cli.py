@@ -68,17 +68,17 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
 
     def cleanup(self):
         self.stop_ffmpeg()
-        self._state.stream_data = (None, None)
+        self._state.update_stream_data((None, None))
 
     def _handle_event(self, event: EventMessage):
         if event.msg_type == Event.SXM_STATUS:
             self._state.sxm_running = event.msg
         elif event.msg_type == Event.HLS_STREAM_STARTED:
-            self._state.stream_data = event.msg
+            self._state.update_stream_data(event.msg)
         elif event.msg_type == Event.UPDATE_METADATA:
             self._state.set_raw_live(event.msg)
         elif event.msg_type == Event.UPDATE_CHANNELS:
-            self._state.channels = event.msg
+            self._state.update_channels(event.msg)
         elif event.msg_type == Event.KILL_HLS_STREAM:
             self._log.info("stream is stopping, killing ffmpeg")
             self.cleanup()

@@ -190,17 +190,17 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
         self._event_queues = [self.hls_stream_queue]
 
         self._state = PlayerState()
-        self._state.stream_data = stream_data
-        self._state.channels = channels  # type: ignore
+        self._state.update_stream_data(stream_data)
+        self._state.update_channels(channels)
         self._state.set_raw_live(raw_live_data)
 
     def _handle_event(self, event: EventMessage):
         if event.msg_type == Event.HLS_STREAM_STARTED:
-            self._state.stream_data = event.msg
+            self._state.update_stream_data(event.msg)
         elif event.msg_type == Event.UPDATE_METADATA:
             self._state.set_raw_live(event.msg)
         elif event.msg_type == Event.UPDATE_CHANNELS:
-            self._state.channels = event.msg
+            self._state.update_channels(event.msg)
         elif event.msg_type == Event.KILL_HLS_STREAM:
             self.local_shutdown_event.set()
         else:
@@ -231,5 +231,5 @@ class ComboLoopedWorker(EventedWorker, SXMStatusSubscriber, HLSStatusSubscriber)
 
         self._state = PlayerState()
         self._state.sxm_running = sxm_status
-        self._state.stream_data = stream_data
+        self._state.update_stream_data(stream_data)
         self._state.set_raw_live(raw_live_data)

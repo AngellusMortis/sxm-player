@@ -62,10 +62,9 @@ OPTION_OUTPUT_FOLDER = typer.Option(
 )
 OPTION_RESET_SONGS = typer.Option(
     False,
-    "-o",
-    "--output-folder",
-    envvar="SXM_OUTPUT_FOLDER",
-    help="output folder to save stream off to as it plays them",
+    "-R",
+    "--reset-songs",
+    help="Reset processed song database",
 )
 ARG_PLAYER_CLASS = typer.Argument(
     None, callback=validate_player, help="Optional Player Class to use"

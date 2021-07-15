@@ -13,6 +13,7 @@ requires=[
   'httpx',
   'ipython',
   'psutil',
+  'pydantic',
   'pyyaml',
   'sqlalchemy',
   'sxm>=0.2.3',

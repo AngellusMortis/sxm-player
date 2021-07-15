@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Union
 
 from sxm.models import XMCutMarker, XMEpisodeMarker, XMSong
 
-from sxm_player.models import Episode, Song
+from sxm_player.models import DBEpisode, DBSong
 from sxm_player.utils import (
     get_air_time,
     get_art_thumb_url,
@@ -44,6 +44,9 @@ class ProcessorWorker(HLSLoopedWorker):
         self._last_loop = time.time() + 90 - ARCHIVE_CHUNK
         self._state.processed_folder = self.processed_folder
         self._state.db_reset = reset_songs
+
+        # force db initialization
+        self._state.db
 
         os.makedirs(self.processed_folder, exist_ok=True)
         os.makedirs(self.archive_folder, exist_ok=True)
@@ -176,7 +179,7 @@ class ProcessorWorker(HLSLoopedWorker):
 
                 is_song = False
                 if isinstance(cut, XMEpisodeMarker):
-                    db_item: Union[Song, Episode] = Episode(
+                    db_item: Union[DBSong, DBEpisode] = DBEpisode(
                         guid=cut.guid,
                         title=title,
                         show=album_or_show,
@@ -187,7 +190,7 @@ class ProcessorWorker(HLSLoopedWorker):
                     )
                 elif isinstance(cut.cut, XMSong):
                     is_song = True
-                    db_item = Song(
+                    db_item = DBSong(
                         guid=cut.guid,
                         title=title,
                         artist=artist,
@@ -222,12 +225,14 @@ class ProcessorWorker(HLSLoopedWorker):
             if cut.duration == 0.0:
                 continue
 
-            db_item: Union[Song, Episode, None] = None
+            db_item: Union[DBSong, DBEpisode, None] = None
             if isinstance(cut, XMEpisodeMarker):
-                db_item = self._state.db.query(Episode).filter_by(guid=cut.guid).first()
+                db_item = (
+                    self._state.db.query(DBEpisode).filter_by(guid=cut.guid).first()
+                )
             elif isinstance(cut.cut, XMSong):
                 existing = (
-                    self._state.db.query(Song)
+                    self._state.db.query(DBSong)
                     .filter_by(title=cut.cut.title, artist=cut.cut.artists[0].name)
                     .all()
                 )
@@ -235,7 +240,7 @@ class ProcessorWorker(HLSLoopedWorker):
                 if len(existing) >= MAX_DUPLICATE_COUNT:
                     continue
 
-                db_item = self._state.db.query(Song).filter_by(guid=cut.guid).first()
+                db_item = self._state.db.query(DBSong).filter_by(guid=cut.guid).first()
 
             if db_item is not None:
                 continue

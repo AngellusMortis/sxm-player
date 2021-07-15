@@ -3,15 +3,20 @@ import time
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple, Union
 
+from pydantic import BaseModel, PrivateAttr  # pylint: disable=no-name-in-module
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.session import Session
 from sxm.models import XMChannel, XMLiveChannel
 
+COOLDOWN_SHORT = 10
+COOLDOWN_MED = 60
+COOLDOWN_LONG = 600
+
 Base = declarative_base()
 
 
-class Song(Base):
+class DBSong(Base):
     __tablename__ = "songs"
 
     guid = Column(String, primary_key=True)
@@ -22,6 +27,20 @@ class Song(Base):
     channel = Column(String)
     file_path = Column(String)
     image_url = Column(String, nullable=True)
+
+
+class Song(BaseModel):
+    guid: str
+    title: str
+    artist: str
+    album: Optional[str]
+    air_time: datetime
+    channel: str
+    file_path: str
+    image_url: Optional[str]
+
+    class Config:
+        orm_mode = True
 
     @property
     def air_time_smart(self):
@@ -58,7 +77,7 @@ class Song(Base):
         return Song.get_pretty_name(self.title, self.artist, True)
 
 
-class Episode(Base):
+class DBEpisode(Base):
     __tablename__ = "episodes"
 
     guid = Column(String, primary_key=True)
@@ -68,6 +87,19 @@ class Episode(Base):
     channel = Column(String)
     file_path = Column(String)
     image_url = Column(String, nullable=True)
+
+
+class Episode(BaseModel):
+    guid: str
+    title: str
+    show: str
+    air_time: datetime
+    channel: str
+    file_path: str
+    image_url: Optional[str]
+
+    class Config:
+        orm_mode = True
 
     @staticmethod
     def get_pretty_name(
@@ -105,11 +137,7 @@ class Episode(Base):
         return Episode.get_pretty_name(self.title, self.show, self.air_time, True)
 
 
-class PlayerState:
-    COOLDOWN_SHORT = 10
-    COOLDOWN_MED = 60
-    COOLDOWN_LONG = 600
-
+class PlayerState(BaseModel):
     stream_url: Optional[str] = None
     stream_channel: Optional[str] = None
     processed_folder: Optional[str] = None
@@ -117,23 +145,22 @@ class PlayerState:
     sxm_running: bool = False
     player_name: Optional[str] = None
 
-    _db: Optional[Session] = None
-    _raw_channels: Optional[List[dict]] = None
-    _raw_live: Optional[dict] = None
-    _channels: Optional[List[XMChannel]] = None
-    _live: Optional[XMLiveChannel] = None
-    _failures: int = 0
-    _cooldown: float = 0
-    _last_failure: float = 0
-    _start_time: Optional[float] = None
-    _time_offset: Optional[float] = None
+    _db: Optional[Session] = PrivateAttr(None)
+    _raw_channels: Optional[List[dict]] = PrivateAttr(None)
+    _raw_live: Optional[dict] = PrivateAttr(None)
+    _channels: Optional[List[XMChannel]] = PrivateAttr(None)
+    _live: Optional[XMLiveChannel] = PrivateAttr(None)
+    _failures: int = PrivateAttr(0)
+    _cooldown: float = PrivateAttr(0)
+    _last_failure: float = PrivateAttr(0)
+    _start_time: Optional[float] = PrivateAttr(None)
+    _time_offset: Optional[float] = PrivateAttr(None)
 
     @property
     def stream_data(self) -> Tuple[Optional[str], Optional[str]]:
         return (self.stream_channel, self.stream_url)
 
-    @stream_data.setter
-    def stream_data(self, value) -> None:
+    def update_stream_data(self, value: Tuple[Optional[str], Optional[str]]) -> None:
         self.stream_channel = value[0]
         self.stream_url = value[1]
 
@@ -149,13 +176,9 @@ class PlayerState:
                 self._channels.append(XMChannel.from_dict(channel))
         return self._channels
 
-    @channels.setter
-    def channels(self, value: Optional[List[dict]]) -> None:
+    def update_channels(self, value: Optional[List[dict]]) -> None:
         """
         Sets channel key in internal `_raw_channels`.
-
-        any calls to this will need to be type: ignored
-        https://github.com/python/mypy/issues/3004
         """
 
         self._channels = None
@@ -173,7 +196,7 @@ class PlayerState:
         if self._db is None and self.processed_folder is not None:
             from .utils import init_db
 
-            self._db = init_db(self.processed_folder, self.db_reset)
+            self._db = init_db(self.processed_folder, reset=self.db_reset)
         return self._db
 
     @property
@@ -182,8 +205,7 @@ class PlayerState:
 
         return self._live
 
-    @live.setter
-    def live(self, value: dict) -> None:
+    def update_live(self, value: dict) -> None:
         """Sets live key in internal `_raw_live`."""
 
         now = int(time.time() * 1000)
@@ -263,11 +285,11 @@ class PlayerState:
     def increase_cooldown(self) -> float:
         extra_seconds = 0
         if self._failures < 3:
-            extra_seconds = PlayerState.COOLDOWN_SHORT
+            extra_seconds = COOLDOWN_SHORT
         elif self._failures < 5:
-            extra_seconds = PlayerState.COOLDOWN_MED
+            extra_seconds = COOLDOWN_MED
         else:
-            extra_seconds = PlayerState.COOLDOWN_LONG
+            extra_seconds = COOLDOWN_LONG
 
         self._cooldown = time.time() + extra_seconds
 
