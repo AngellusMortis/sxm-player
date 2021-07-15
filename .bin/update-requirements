@@ -8,7 +8,7 @@ BASE_DIR=$( realpath $( dirname "${BASH_SOURCE[0]}" )/../ )
 
 pushd "$BASE_DIR" 2>&1 >/dev/null
 
-pip-compile --output-file=requirements.txt pyproject.toml
-pip-compile --extra=dev --extra=doc --extra=test --output-file=dev-requirements.txt pyproject.toml
+pip-compile --upgrade --output-file=requirements.txt pyproject.toml
+pip-compile --upgrade --extra=dev --extra=doc --extra=test --output-file=dev-requirements.txt pyproject.toml
 
 popd 2>&1 >/dev/null

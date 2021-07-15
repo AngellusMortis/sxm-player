@@ -16,7 +16,7 @@ requires=[
   'psutil',
   'pyyaml',
   'sqlalchemy',
-  'sxm',
+  'sxm>=0.2.2',
 ]
 
 description-file='README.rst'
