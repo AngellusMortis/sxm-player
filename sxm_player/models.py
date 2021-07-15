@@ -6,7 +6,6 @@ from typing import List, Optional, Tuple, Union
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.session import Session
-
 from sxm.models import XMChannel, XMLiveChannel
 
 Base = declarative_base()
@@ -15,22 +14,30 @@ Base = declarative_base()
 class Song(Base):  # type: ignore
     __tablename__ = "songs"
 
-    guid: str = Column(String, primary_key=True)
-    title: str = Column(String, index=True)
-    artist: str = Column(String, index=True)
-    album: str = Column(String, nullable=True)
-    air_time: datetime = Column(DateTime)
-    channel: str = Column(String)
-    file_path: str = Column(String)
-    image_url: str = Column(String, nullable=True)
+    guid = Column(String, primary_key=True)
+    title = Column(String, index=True)
+    artist = Column(String, index=True)
+    album = Column(String, nullable=True)
+    air_time = Column(DateTime)
+    channel = Column(String)
+    file_path = Column(String)
+    image_url = Column(String, nullable=True)
 
     @property
     def air_time_smart(self):
         return self.air_time.replace(tzinfo=timezone.utc)
 
     @staticmethod
-    def get_pretty_name(title: str, artist: str, bold: bool = False) -> str:
+    def get_pretty_name(
+        title: Optional[str], artist: Optional[str], bold: bool = False
+    ) -> str:
         """Returns a formatted name of song"""
+
+        if title is None:
+            title = ""
+
+        if artist is None:
+            artist = ""
 
         mod = ""
         if bold:
@@ -54,24 +61,35 @@ class Song(Base):  # type: ignore
 class Episode(Base):  # type: ignore
     __tablename__ = "episodes"
 
-    guid: str = Column(String, primary_key=True)
-    title: str = Column(String, index=True)
-    show: str = Column(String, nullable=True, index=True)
-    air_time: datetime = Column(DateTime)
-    channel: str = Column(String)
-    file_path: str = Column(String)
-    image_url: str = Column(String, nullable=True)
+    guid = Column(String, primary_key=True)
+    title = Column(String, index=True)
+    show = Column(String, nullable=True, index=True)
+    air_time = Column(DateTime)
+    channel = Column(String)
+    file_path = Column(String)
+    image_url = Column(String, nullable=True)
 
     @staticmethod
     def get_pretty_name(
-        title: str, show: str, air_time: datetime, bold: bool = False
+        title: Optional[str],
+        show: Optional[str],
+        air_time: Optional[datetime],
+        bold: bool = False,
     ) -> str:
         """Returns a formatted name of show"""
+
+        if title is None:
+            title = ""
+
+        if show is None:
+            show = ""
 
         mod = ""
         if bold:
             mod = "**"
 
+        if air_time is None:
+            f'{mod}"{title}"{mod} ({show})'
         return f'{mod}"{title}"{mod} ({show}) from {air_time}'
 
     @property
@@ -128,7 +146,7 @@ class PlayerState:
                 return []
             self._channels = []
             for channel in self._raw_channels:
-                self._channels.append(XMChannel(channel))
+                self._channels.append(XMChannel.from_dict(channel))
         return self._channels
 
     @channels.setter
@@ -168,7 +186,7 @@ class PlayerState:
         self._raw_live = value
 
         if self._raw_live is not None:
-            self._live = XMLiveChannel(self._raw_live)
+            self._live = XMLiveChannel.from_dict(self._raw_live)
 
             if self._live.tune_time is not None:
                 self._time_offset = now - self._live.tune_time
@@ -196,7 +214,7 @@ class PlayerState:
         self._raw_live = live_data[2]
 
         if self._raw_live is not None:
-            self._live = XMLiveChannel(self._raw_live)
+            self._live = XMLiveChannel.from_dict(self._raw_live)
 
     @property
     def radio_time(self) -> Union[int, None]:

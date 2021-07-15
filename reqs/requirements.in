@@ -1,8 +1,0 @@
-click>=7.0
-coloredlogs
-ipython
-plexapi
-psutil
-pyyaml
-sqlalchemy
-sxm

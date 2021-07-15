@@ -1,9 +1,9 @@
 from typing import Optional, Tuple, Type
 
 from ..models import PlayerState
+from ..players.base import BasePlayer
 from ..runner import Runner
 from ..workers import BaseWorker, DebugWorker
-from ..players.base import BasePlayer
 
 
 class DebugPlayer(BasePlayer):

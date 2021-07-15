@@ -3,8 +3,8 @@ import tempfile
 import time
 from typing import Optional, Tuple
 
-from ..utils import FFmpeg
 from ..queue import Event, EventMessage
+from ..utils import FFmpeg
 from .base import SXMLoopedWorker
 
 __all__ = ["HLSWorker"]

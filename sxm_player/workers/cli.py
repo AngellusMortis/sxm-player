@@ -1,8 +1,8 @@
 import time
 from typing import Optional
 
-from ..utils import FFmpeg
 from ..queue import Event, EventMessage
+from ..utils import FFmpeg
 from .base import ComboLoopedWorker
 
 FFMPEG_COMMAND = "ffmpeg -y -loglevel fatal -f mpegts -i {} {}"
@@ -42,7 +42,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
                 self._log.info(f"CLI Player start: {self.name}")
                 self.start_ffmpeg()
         elif not self.check_process():
-            self._log.info(f"ffmpeg process is not active, removing ffmpeg process")
+            self._log.info("ffmpeg process is not active, removing ffmpeg process")
             self.cleanup()
         else:
             # read errors must be ran to prevent deadlock
@@ -63,7 +63,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
                         )
                     )
         else:
-            self._log.info(f"stream is dead, killing ffmpeg")
+            self._log.info("stream is dead, killing ffmpeg")
             self.cleanup()
 
     def cleanup(self):
@@ -80,7 +80,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
         elif event.msg_type == Event.UPDATE_CHANNELS:
             self._state.channels = event.msg
         elif event.msg_type == Event.KILL_HLS_STREAM:
-            self._log.info(f"stream is stopping, killing ffmpeg")
+            self._log.info("stream is stopping, killing ffmpeg")
             self.cleanup()
         else:
             self._log.warning(

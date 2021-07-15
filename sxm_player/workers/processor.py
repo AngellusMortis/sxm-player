@@ -1,16 +1,16 @@
 import os
-from typing import Dict
 import time
+from typing import Dict, List, Optional, Union
 
-from sxm.models import XMMarker
+from sxm.models import XMCutMarker, XMEpisodeMarker, XMSong
 
 from ..models import Episode, Song
 from ..utils import (
     get_air_time,
+    get_art_thumb_url,
+    get_art_url_by_size,
     get_files,
     splice_file,
-    get_art_url_by_size,
-    get_art_thumb_url,
 )
 from .archiver import ARCHIVE_CHUNK
 from .base import HLSLoopedWorker
@@ -69,9 +69,8 @@ class ProcessorWorker(HLSLoopedWorker):
             archives[archive_key] = os.path.join(channel_archive, archive_file)
         self._log.debug(f"found {len(archives.keys())}")
 
-        processed_songs = self._process_cuts(archives, is_song=True)
-
-        processed_shows = self._process_cuts(archives, is_song=False)
+        processed_songs = self._process_cuts(archives, self._state.live.song_cuts)
+        processed_shows = self._process_cuts(archives, self._state.live.episode_markers)
 
         self._log.info(f"processed: {processed_songs} songs, {processed_shows} shows")
 
@@ -92,7 +91,7 @@ class ProcessorWorker(HLSLoopedWorker):
         )
 
     def _process_cut(
-        self, archives: Dict[str, str], cut: XMMarker, is_song: bool = True
+        self, archives: Dict[str, str], cut: Union[XMCutMarker, XMEpisodeMarker]
     ) -> bool:
         """Processes `archives` to splice out an
         instance of `XMMarker` if it exists"""
@@ -130,17 +129,7 @@ class ProcessorWorker(HLSLoopedWorker):
 
             air_time = get_air_time(cut)
 
-            if is_song:
-                title = self._path_filter(cut.cut.title)
-                artist = self._path_filter(cut.cut.artists[0].name)
-
-                if cut.cut.album is not None and cut.cut.album.title is not None:
-                    album_or_show = self._path_filter(cut.cut.album.title)
-                    album_url = get_art_url_by_size(cut.cut.album.arts, "MEDIUM")
-
-                filename = f"{title}.{cut.guid}.mp3"
-                folder = os.path.join(folder, "songs", artist)
-            else:
+            if isinstance(cut, XMEpisodeMarker):
                 title = self._path_filter(
                     cut.episode.long_title or cut.episode.medium_title
                 )
@@ -155,6 +144,18 @@ class ProcessorWorker(HLSLoopedWorker):
                     f'{title}.{air_time.strftime("%Y-%m-%d-%H.%M")}' f".{cut.guid}.mp3"
                 )
                 folder = os.path.join(folder, "shows")
+            elif isinstance(cut.cut, XMSong):
+                title = self._path_filter(cut.cut.title)
+                artist = self._path_filter(cut.cut.artists[0].name)
+
+                if cut.cut.album is not None and cut.cut.album.title is not None:
+                    album_or_show = self._path_filter(cut.cut.album.title)
+                    album_url = get_art_url_by_size(cut.cut.album.arts, "MEDIUM")
+
+                filename = f"{title}.{cut.guid}.mp3"
+                folder = os.path.join(folder, "songs", artist)
+            else:
+                return False
 
             if album_or_show is not None:
                 folder = os.path.join(folder, album_or_show)
@@ -172,9 +173,19 @@ class ProcessorWorker(HLSLoopedWorker):
                     os.remove(path)
                     return False
 
-                db_item = None
-
-                if is_song:
+                is_song = False
+                if isinstance(cut, XMEpisodeMarker):
+                    db_item: Union[Song, Episode] = Episode(
+                        guid=cut.guid,
+                        title=title,
+                        show=album_or_show,
+                        air_time=air_time,
+                        channel=self._state.stream_channel,
+                        file_path=path,
+                        image_url=album_url,
+                    )
+                elif isinstance(cut.cut, XMSong):
+                    is_song = True
                     db_item = Song(
                         guid=cut.guid,
                         title=title,
@@ -186,15 +197,7 @@ class ProcessorWorker(HLSLoopedWorker):
                         image_url=album_url,
                     )
                 else:
-                    db_item = Episode(
-                        guid=cut.guid,
-                        title=title,
-                        show=album_or_show,
-                        air_time=air_time,
-                        channel=self._state.stream_channel,
-                        file_path=path,
-                        image_url=album_url,
-                    )
+                    return False
 
                 self._state.db.add(db_item)
                 self._state.db.commit()
@@ -202,25 +205,26 @@ class ProcessorWorker(HLSLoopedWorker):
                 return True
         return False
 
-    def _process_cuts(self, archives: Dict[str, str], is_song: bool = True) -> int:
+    def _process_cuts(
+        self,
+        archives: Dict[str, str],
+        cuts: Union[List[XMCutMarker], List[XMEpisodeMarker]],
+    ) -> int:
         """Processes `archives` to splice out any
         instance of `XMMarker` if it exists"""
 
         if self._state.live is None or self._state.db is None:
             return 0
 
-        if is_song:
-            cuts = self._state.live.song_cuts
-        else:
-            cuts = self._state.live.episode_markers
-
         processed = 0
         for cut in cuts:
             if cut.duration == 0.0:
                 continue
 
-            db_item = None
-            if is_song:
+            db_item: Union[Song, Episode, None] = None
+            if isinstance(cut, XMEpisodeMarker):
+                db_item = self._state.db.query(Episode).filter_by(guid=cut.guid).first()
+            elif isinstance(cut.cut, XMSong):
                 existing = (
                     self._state.db.query(Song)
                     .filter_by(title=cut.cut.title, artist=cut.cut.artists[0].name)
@@ -231,22 +235,22 @@ class ProcessorWorker(HLSLoopedWorker):
                     continue
 
                 db_item = self._state.db.query(Song).filter_by(guid=cut.guid).first()
-            else:
-                db_item = self._state.db.query(Episode).filter_by(guid=cut.guid).first()
 
             if db_item is not None:
                 continue
 
-            title = None
-            if is_song:
-                title = cut.cut.title
-            else:
+            title: Optional[str] = None
+            if isinstance(cut, XMEpisodeMarker):
                 title = cut.episode.long_title or cut.episode.medium_title
+            elif isinstance(cut.cut, XMSong):
+                title = cut.cut.title
 
+            if title is None:
+                title = "unknown"
             self._log.debug(
                 f"processing {title}: " f"{cut.time}: {cut.duration}" f"{cut.guid}"
             )
-            success = self._process_cut(archives, cut, is_song)
+            success = self._process_cut(archives, cut)
 
             if success:
                 processed += 1

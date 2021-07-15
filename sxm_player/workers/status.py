@@ -1,4 +1,4 @@
-import requests
+import httpx
 
 from ..queue import Event, EventMessage
 from .base import SXMLoopedWorker
@@ -32,7 +32,7 @@ class StatusWorker(SXMLoopedWorker):
     def check_sxm(self):
         if self._state.sxm_running:
             self._log.debug("Checking SXM Client")
-            r = requests.get(f"http://{self._ip}:{self._port}/channels/")
+            r = httpx.get(f"http://{self._ip}:{self._port}/channels/")
 
             if not r.ok:
                 # adjust delay to check more often

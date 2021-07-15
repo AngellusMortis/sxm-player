@@ -14,9 +14,9 @@ plugins:
   fixme:
     enabled: true
   git-legal:
-    enabled: true
+    enabled: false
   pep8:
-    enabled: true
+    enabled: false
   radon:
     enabled: true
     config:

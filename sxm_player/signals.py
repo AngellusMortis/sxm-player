@@ -1,5 +1,5 @@
-import signal
 import functools
+import signal
 
 
 class TerminateInterrupt(BaseException):

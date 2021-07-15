@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    name: "Test and Lint"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python: [3.7, 3.8, 3.9]
+        include:
+          - python: "3.10.0-beta.4"
+            experimental: true
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r dev-requirements.txt
+
+      - name: Lint Code
+        run: .bin/lint-code
+    # - name: Test with pytest
+    #   run: pytest --force-sugar
+    # - name: Publish Code Coverage
+    #   uses: paambaati/codeclimate-action@v2.7.5
+    #   env:
+    #     CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+    #   with:
+    #     coverageCommand: coverage xml
+    #     coverageLocations: ${{github.workspace}}/coverage.xml:cobertura

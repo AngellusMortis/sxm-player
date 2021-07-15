@@ -6,13 +6,12 @@ import shlex
 import subprocess  # nosec
 from typing import List, Optional, Union
 
-import coloredlogs
+import coloredlogs  # type: ignore
 import psutil
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
-
-from sxm.models import XMMarker, XMArt, XMImage
+from sxm.models import XMArt, XMImage, XMMarker
 
 from .models import Episode, Song
 
@@ -27,7 +26,6 @@ unrelated_loggers = [
     "discord.client",
     "discord.gateway",
     "discord.http",
-    "plexapi",
     "urllib3.connectionpool",
     "websockets.protocol",
 ]
@@ -97,7 +95,13 @@ def get_art_thumb_url(arts: List[XMArt]) -> Optional[str]:
     thumb: Optional[str] = None
 
     for art in arts:
-        if art.height > 100 and art.height < 200 and art.height == art.width:
+        if (
+            isinstance(art, XMImage)
+            and art.height is not None
+            and art.height > 100
+            and art.height < 200
+            and art.height == art.width
+        ):
             # logo on dark is what we really want
             if art.name == "show logo on dark":
                 thumb = art.url
@@ -174,9 +178,11 @@ class FFmpeg:
         self.process = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)  # nosec
 
         self._stderr_poll = select.poll()  # pylint: disable=E1101
-        self._stderr_poll.register(
-            self.process.stderr, select.POLLIN  # pylint: disable=E1101 # noqa
-        )
+
+        if self.process.stderr is not None:
+            self._stderr_poll.register(
+                self.process.stderr, select.POLLIN  # pylint: disable=E1101 # noqa
+            )
 
     def check_process(self) -> bool:
         if self.process is None:
@@ -203,6 +209,7 @@ class FFmpeg:
 
         lines: List[str] = []
         while self._stderr_poll.poll(0.1):
-            lines.append(self.process.stderr.readline().decode("utf8"))
+            if self.process.stderr is not None:
+                lines.append(self.process.stderr.readline().decode("utf8"))
 
         return lines

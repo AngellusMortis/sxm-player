@@ -1,9 +1,9 @@
-import time
 import multiprocessing.queues as mpq
-from multiprocessing import get_context
-from typing import Optional, Any
-from queue import Empty, Full
+import time
 from enum import Enum, auto
+from multiprocessing import get_context
+from queue import Empty, Full
+from typing import Any, Optional
 
 DEFAULT_POLLING_TIMEOUT = 0.02
 
@@ -22,7 +22,7 @@ class Event(Enum):
 
 
 class EventMessage:
-    id: float
+    id: float  # noqa: A003
     msg_src: str
     msg_relay: str
     msg_type: Event

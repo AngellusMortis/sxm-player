@@ -1,12 +1,12 @@
 import logging
-from typing import Type, Tuple, TypeVar, Dict, Optional, List
-from multiprocessing import Process, Event
 import time
+from multiprocessing import Event, Process
+from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
+from .queue import Queue
 from .signals import default_signal_handler, init_signals
 from .utils import configure_root_logger
-from .workers import BaseWorker, SXMStatusSubscriber, HLSStatusSubscriber
-from .queue import Queue
+from .workers import BaseWorker, HLSStatusSubscriber, SXMStatusSubscriber
 
 STOP_WAIT_SECS = 3.0
 STARTUP_WAIT_SECS = 10.0

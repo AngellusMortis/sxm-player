@@ -5,11 +5,7 @@ from typing import List, Optional, Tuple
 
 from ..models import PlayerState
 from ..queue import Event, EventMessage, Queue
-from ..signals import (
-    default_signal_handler,
-    init_signals,
-    interupt_signal_handler,
-)
+from ..signals import default_signal_handler, init_signals, interupt_signal_handler
 
 __all__ = [
     "BaseWorker",
