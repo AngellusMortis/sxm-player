@@ -3,8 +3,20 @@ sxm-player
 ==========
 
 .. image:: https://readthedocs.org/projects/sxm-player/badge/?version=latest
-        :target: https://sxm-player.readthedocs.io/en/latest/?badge=latest
-        :alt: Documentation Status
+    :target: https://sxm-player.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
+.. image:: https://github.com/AngellusMortis/sxm-player/actions/workflows/ci.yml/badge.svg
+    :target: https://github.com/AngellusMortis/sxm-player/actions/workflows/ci.yml
+    :alt: CI Status
+
+.. image:: https://api.codeclimate.com/v1/badges/afffd386b11a760d80cc/maintainability
+   :target: https://codeclimate.com/github/AngellusMortis/sxm-player/maintainability
+   :alt: Maintainability
+
+.. image:: https://pypip.in/v/sxm-player/badge.png
+    :target: https://pypi.org/project/sxm-player/
+    :alt: Latest PyPI version
 
 .. warning:: Designed for PERSONAL USE ONLY
 
