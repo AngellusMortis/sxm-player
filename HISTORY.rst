@@ -5,8 +5,6 @@ History
 0.2.0 (2021-08-15)
 ------------------
 
-(WIP -- Pending)
-
 * Replaces setuptools with filt
 * Updates linting
 * Replaces TravisCI with Github Actions

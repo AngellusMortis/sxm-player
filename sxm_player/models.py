@@ -249,8 +249,11 @@ class PlayerState(BaseModel):
 
         if self.live is None:
             return None
-        # still working on offset:  - self.time_offset
-        return int(time.time() * 1000)
+
+        now = int(time.time() * 1000)
+        if self._time_offset is not None:
+            return now - int(self._time_offset)
+        return now
 
     @property
     def start_time(self) -> Union[float, None]:
