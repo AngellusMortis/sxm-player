@@ -1,6 +1,6 @@
 import logging
 import time
-from multiprocessing import Event as MPEvent
+from multiprocessing import synchronize
 from typing import List, Optional, Tuple
 
 from ..models import PlayerState
@@ -25,15 +25,15 @@ class BaseWorker:
     name: str = NAME
     int_handler: staticmethod = staticmethod(default_signal_handler)
     term_handler: staticmethod = staticmethod(default_signal_handler)
-    startup_event: MPEvent  # type: ignore
-    shutdown_event: MPEvent  # type: ignore
-    local_shutdown_event: MPEvent  # type: ignore
+    startup_event: synchronize.Event
+    shutdown_event: synchronize.Event
+    local_shutdown_event: synchronize.Event
 
     def __init__(
         self,
-        startup_event: MPEvent,  # type: ignore
-        shutdown_event: MPEvent,  # type: ignore
-        local_shutdown_event: MPEvent,  # type: ignore
+        startup_event: synchronize.Event,
+        shutdown_event: synchronize.Event,
+        local_shutdown_event: synchronize.Event,
         event_queue: Queue,
         name: str = "worker",
         *args,
@@ -202,7 +202,7 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
         elif event.msg_type == Event.UPDATE_CHANNELS:
             self._state.channels = event.msg
         elif event.msg_type == Event.KILL_HLS_STREAM:
-            self.local_shutdown_event.set()  # type: ignore
+            self.local_shutdown_event.set()
         else:
             self._log.warning(
                 f"Unknown event received: {event.msg_src}, {event.msg_type}"

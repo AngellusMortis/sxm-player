@@ -1,10 +1,10 @@
 import os
 from typing import Optional
 
-from .models import PlayerState
-from .queue import Event, EventMessage
-from .runner import Runner, Worker
-from .workers import (
+from sxm_player.models import PlayerState
+from sxm_player.queue import Event, EventMessage
+from sxm_player.runner import Runner, Worker
+from sxm_player.workers import (
     ArchiveWorker,
     CLIPlayerWorker,
     HLSWorker,

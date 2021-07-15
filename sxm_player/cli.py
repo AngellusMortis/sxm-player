@@ -3,103 +3,100 @@
 """Console script for sxm_player."""
 import os
 from multiprocessing import set_start_method
+from pathlib import Path
 from typing import Optional, Type
 
-import click
 import psutil
+import typer
+from sxm.cli import (
+    OPTION_HOST,
+    OPTION_PASSWORD,
+    OPTION_PORT,
+    OPTION_REGION,
+    OPTION_USERNAME,
+    OPTION_VERBOSE,
+)
 
-from . import handlers
-from .command import ConfigCommandClass, PlayerClass
-from .models import PlayerState
-from .players import BasePlayer
-from .queue import Event, EventMessage
-from .runner import Runner
-from .utils import ACTIVE_PROCESS_STATUSES
-from .workers import ServerWorker, StatusWorker
+from sxm_player import handlers
+from sxm_player.command import validate_player
+from sxm_player.models import PlayerState
+from sxm_player.players import BasePlayer
+from sxm_player.queue import Event, EventMessage
+from sxm_player.runner import Runner
+from sxm_player.utils import ACTIVE_PROCESS_STATUSES
+from sxm_player.workers import ServerWorker, StatusWorker
 
-
-@click.command(cls=ConfigCommandClass)
-# Generic Parameters
-@click.option(
+OPTION_CONFIG_FILE = typer.Option(
+    None,
     "-c",
     "--config-file",
-    type=click.Path(),
+    exists=True,
+    file_okay=True,
+    dir_okay=False,
+    readable=True,
+    resolve_path=True,
     help="Config file to read vars from",
 )
-@click.option(
-    "-l", "--log-file", type=click.Path(), default=None, help="output log file"
+OPTION_LOG_FILE = typer.Option(
+    None,
+    "-l",
+    "--log-file",
+    exists=True,
+    file_okay=True,
+    resolve_path=True,
+    dir_okay=False,
+    readable=True,
+    help="Output log file",
 )
-@click.option("-d", "--debug", is_flag=True, help="enable debug logging")
-# SXM Parameters
-@click.option(
-    "-p",
-    "--port",
-    type=int,
-    default=9999,
-    help="port to run SXM Proxy server on",
-)
-@click.option(
-    "-h",
-    "--host",
-    type=str,
-    default="127.0.0.1",
-    help="IP to bind SXM Proxy server to",
-)
-@click.option(
-    "--username",
-    type=str,
-    envvar="SXM_USERNAME",
-    help="SXM Username",
-    required=True,
-)
-@click.option(
-    "--password",
-    type=str,
-    envvar="SXM_PASSWORD",
-    help="SXM Password",
-    required=True,
-)
-@click.option(
-    "-r",
-    "--region",
-    type=click.Choice(["US", "CA"]),
-    default="US",
-    help="Sets the SXM client's region",
-)
-# Archiving/Processing parameters
-@click.option(
+OPTION_OUTPUT_FOLDER = typer.Option(
+    None,
     "-o",
     "--output-folder",
-    type=click.Path(),
-    default=None,
-    envvar="MUSIC_OUTPUT_FOLDER",
+    file_okay=False,
+    dir_okay=True,
+    readable=True,
+    writable=True,
+    resolve_path=True,
+    envvar="SXM_OUTPUT_FOLDER",
     help="output folder to save stream off to as it plays them",
 )
-@click.option("-r", "--reset-songs", is_flag=True, help="reset processed song database")
-# Player paramaters
-@click.argument("player_class", type=PlayerClass(), required=False, default=None)
+OPTION_RESET_SONGS = typer.Option(
+    False,
+    "-o",
+    "--output-folder",
+    envvar="SXM_OUTPUT_FOLDER",
+    help="output folder to save stream off to as it plays them",
+)
+ARG_PLAYER_CLASS = typer.Argument(
+    None, callback=validate_player, help="Optional Player Class to use"
+)
+
+
 def main(
-    config_file: str,
-    log_file: str,
-    debug: bool,
-    username: str,
-    password: str,
-    region: str,
-    port: int,
-    host: str,
-    output_folder: str,
-    reset_songs: bool,
-    player_class: Type[BasePlayer],
-    **kwargs,
+    config_file: Optional[Path] = OPTION_CONFIG_FILE,
+    log_file: Optional[Path] = OPTION_LOG_FILE,
+    verbose: bool = OPTION_VERBOSE,
+    username: str = OPTION_USERNAME,
+    password: str = OPTION_PASSWORD,
+    region: str = OPTION_REGION,
+    port: int = OPTION_PORT,
+    host: str = OPTION_HOST,
+    output_folder: Optional[Path] = OPTION_OUTPUT_FOLDER,
+    reset_songs: bool = OPTION_RESET_SONGS,
+    player_class: Optional[str] = ARG_PLAYER_CLASS,
 ):
     """Command line interface for sxm-player"""
 
-    if debug:
+    if verbose:
         set_start_method("spawn")
 
     os.system("/usr/bin/clear")  # nosec
 
-    with Runner(log_file, debug) as runner:
+    klass: Optional[Type[BasePlayer]] = None
+    if player_class is not None:
+        klass = player_class  # type: ignore
+
+    with Runner(log_file, verbose) as runner:
         state = PlayerState()
 
         runner.create_worker(
@@ -110,13 +107,13 @@ def main(
             sxm_status=state.sxm_running,
         )
 
-        if player_class is not None:
-            worker_args = player_class.get_worker_args(**locals())
+        if klass is not None:
+            worker_args = klass.get_worker_args(**locals())
             if worker_args is not None:
                 state.player_name = worker_args[1]
                 runner.create_worker(worker_args[0], worker_args[1], **(worker_args[2]))
 
-        while not runner.shutdown_event.is_set():  # type: ignore
+        while not runner.shutdown_event.is_set():
             event_loop(**locals())
 
     return 0
@@ -174,7 +171,7 @@ def event_loop(runner: Runner, state: PlayerState, **kwargs):
 
 def handle_event(event: EventMessage, **kwargs):
     runner = kwargs["runner"]
-    debug = kwargs["debug"]
+    debug = kwargs["verbose"]
     event_name = event.msg_type.name.lower()
     is_debug_event = event_name.startswith("debug")
     handler_name = f"handle_{event_name}_event"
@@ -199,4 +196,4 @@ def check_player(runner: Runner, state: PlayerState):
 
         if not running:
             runner.log.info("Player has stopped, shutting down")
-            runner.shutdown_event.set()  # type: ignore
+            runner.shutdown_event.set()

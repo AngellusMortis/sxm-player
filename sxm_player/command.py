@@ -1,16 +1,17 @@
 import importlib
 import inspect
-from typing import Optional, Type
+from typing import List, Optional, Type, Union
 
-import click
+import typer
 import yaml
+from typer.core import TyperCommand
 
-from .players import BasePlayer
+from sxm_player.players import BasePlayer
 
 BASE_PLAYER = "sxm_player.players.BasePlayer "
 
 
-class ConfigCommandClass(click.Command):
+class ConfigCommandClass(TyperCommand):
     def make_context(self, info_name, args, parent=None, **extra):
         config_file = self.get_config_file(args)
         if config_file is not None:
@@ -24,12 +25,23 @@ class ConfigCommandClass(click.Command):
         parser = self.make_parser(context)
         options, _, _ = parser.parse_args(args=args.copy())
 
+        extra_args: List[str] = []
         if "player_class" in options:
             player_class = self.get_player_class(context, options)
             if player_class is not None:
-                self.params = self.params + player_class.get_params()
+                player_params = player_class.get_params()
+                self.params = self.params + player_params
+                extra_args = [p.name for p in player_params]
 
-        return super().parse_args(context, args)
+        super().parse_args(context, args)
+        self.map_extra_args(context, extra_args)
+        return
+
+    def map_extra_args(self, context, extra_args: List[str]):
+        for arg in extra_args:
+            if arg in context.params:
+                param = context.params.pop(arg)
+                context.meta[arg] = param
 
     def get_player_class(self, context, options) -> Optional[Type[BasePlayer]]:
         player_param = None
@@ -69,40 +81,38 @@ class ConfigCommandClass(click.Command):
             return yaml.safe_load(f)
 
 
-class PlayerClass(click.ParamType):
-    name = "python_class"
+def _get_module(class_name):
+    module_path = "sxm_player.players"
 
-    def convert(self, value, param, ctx):
-        if not isinstance(value, str) and issubclass(value, BasePlayer):
-            return value
-
-        module_path, class_name = self._get_module(value)
-
+    if "." in class_name:
         try:
-            module = importlib.import_module(module_path)
-        except ModuleNotFoundError:
-            self.fail(f"{module_path} is not a Python module")
+            module_path, class_name = class_name.rsplit(".", 1)
+        except ValueError:
+            raise typer.BadParameter(f"{class_name} is not a Python path")
 
-        try:
-            klass = getattr(module, class_name)
-        except AttributeError:
-            self.fail(f"{class_name} does not inside in {module_path}")
+    return (module_path, class_name)
 
-        if not inspect.isclass(klass):
-            self.fail(f"{class_name} is not a class")
 
-        if not issubclass(klass, BasePlayer):
-            self.fail(f"{class_name} does not inherit from {BASE_PLAYER}")
+def validate_player(value: Union[str, Type[BasePlayer]]):
+    if value is None or not isinstance(value, str) and issubclass(value, BasePlayer):
+        return value
 
-        return klass
+    module_path, class_name = _get_module(value)
 
-    def _get_module(self, class_name):
-        module_path = "sxm_player.players"
+    try:
+        module = importlib.import_module(module_path)
+    except ModuleNotFoundError:
+        raise typer.BadParameter(f"{module_path} is not a Python module")
 
-        if "." in class_name:
-            try:
-                module_path, class_name = class_name.rsplit(".", 1)
-            except ValueError:
-                self.fail(f"{class_name} is not a Python path")
+    try:
+        klass = getattr(module, class_name)
+    except AttributeError:
+        raise typer.BadParameter(f"{class_name} does not inside in {module_path}")
 
-        return (module_path, class_name)
+    if not inspect.isclass(klass):
+        raise typer.BadParameter(f"{class_name} is not a class")
+
+    if not issubclass(klass, BasePlayer):
+        raise typer.BadParameter(f"{class_name} does not inherit from {BASE_PLAYER}")
+
+    return klass

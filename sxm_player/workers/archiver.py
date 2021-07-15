@@ -2,9 +2,9 @@ import os
 import time
 from typing import Dict, Optional, Tuple, Union
 
-from ..queue import Event, EventMessage
-from ..utils import get_files, splice_file
-from .base import HLSLoopedWorker
+from sxm_player.queue import Event, EventMessage
+from sxm_player.utils import get_files, splice_file
+from sxm_player.workers.base import HLSLoopedWorker
 
 __all__ = ["ArchiveWorker"]
 
@@ -37,7 +37,7 @@ class ArchiveWorker(HLSLoopedWorker):
 
     def loop(self) -> None:
         if self._state.stream_channel is None or self.stream_folder is None:
-            self.local_shutdown_event.set()  # type: ignore
+            self.local_shutdown_event.set()
             return
 
         deleted = 0

@@ -28,7 +28,7 @@ exit_code=$?
 echo
 
 echo "Running bandit..."
-bandit -c .bandit.yml -r conftest.py sxm_player/
+bandit -c .bandit.yml -r sxm_player/
 test $? -eq 0 -a $exit_code -eq 0
 exit_code=$?
 echo

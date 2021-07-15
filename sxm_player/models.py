@@ -11,7 +11,7 @@ from sxm.models import XMChannel, XMLiveChannel
 Base = declarative_base()
 
 
-class Song(Base):  # type: ignore
+class Song(Base):
     __tablename__ = "songs"
 
     guid = Column(String, primary_key=True)
@@ -58,7 +58,7 @@ class Song(Base):  # type: ignore
         return Song.get_pretty_name(self.title, self.artist, True)
 
 
-class Episode(Base):  # type: ignore
+class Episode(Base):
     __tablename__ = "episodes"
 
     guid = Column(String, primary_key=True)
@@ -151,7 +151,12 @@ class PlayerState:
 
     @channels.setter
     def channels(self, value: Optional[List[dict]]) -> None:
-        """Sets channel key in internal `_raw_channels`."""
+        """
+        Sets channel key in internal `_raw_channels`.
+
+        any calls to this will need to be type: ignored
+        https://github.com/python/mypy/issues/3004
+        """
 
         self._channels = None
         self._raw_channels = value

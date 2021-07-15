@@ -1,12 +1,13 @@
 import logging
 import time
-from multiprocessing import Event, Process
+from multiprocessing import Event, Process, synchronize
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Type, TypeVar
 
-from .queue import Queue
-from .signals import default_signal_handler, init_signals
-from .utils import configure_root_logger
-from .workers import BaseWorker, HLSStatusSubscriber, SXMStatusSubscriber
+from sxm_player.queue import Queue
+from sxm_player.signals import default_signal_handler, init_signals
+from sxm_player.utils import configure_root_logger
+from sxm_player.workers import BaseWorker, HLSStatusSubscriber, SXMStatusSubscriber
 
 STOP_WAIT_SECS = 3.0
 STARTUP_WAIT_SECS = 10.0
@@ -20,10 +21,10 @@ def _sleep_secs(max_sleep, end_time=999_999_999_999_999.9):
 def worker_wrapper(
     worker_class: Type[BaseWorker],
     log_level: str,
-    log_file: Optional[str],
-    startup_event: Event,  # type: ignore
-    shutdown_event: Event,  # type: ignore
-    local_shutdown_event: Event,  # type: ignore
+    log_file: Optional[Path],
+    startup_event: synchronize.Event,
+    shutdown_event: synchronize.Event,
+    local_shutdown_event: synchronize.Event,
     event_queue: Queue,
     sxm_status_queue: Optional[Queue],
     hls_stream_queue: Optional[Queue],
@@ -51,9 +52,9 @@ def worker_wrapper(
 
 
 class Worker:
-    startup_event: Event  # type: ignore
-    shutdown_event: Event  # type: ignore
-    local_shutdown_event: Event  # type: ignore
+    startup_event: synchronize.Event
+    shutdown_event: synchronize.Event
+    local_shutdown_event: synchronize.Event
     process: Process
     name: str
     sxm_status_queue: Optional[Queue] = None
@@ -63,9 +64,9 @@ class Worker:
         self,
         logger: logging.Logger,
         log_level: str,
-        log_file: Optional[str],
+        log_file: Optional[Path],
         worker_class: Type[BaseWorker],
-        shutdown_event: Event,  # type: ignore
+        shutdown_event: synchronize.Event,
         event_queue: Queue,
         sxm_status_queue: Optional[Queue],
         hls_stream_queue: Optional[Queue],
@@ -152,13 +153,13 @@ RunnerType = TypeVar("RunnerType", bound="Runner")
 class Runner:
     workers: Dict[str, Worker]
     queues: List[Queue]
-    shutdown_event: Event  # type: ignore
+    shutdown_event: synchronize.Event
     event_queue: Queue
     log: logging.Logger
     log_level: str
-    log_file: Optional[str]
+    log_file: Optional[Path]
 
-    def __init__(self, log_file: Optional[str], debug: bool):
+    def __init__(self, log_file: Optional[Path], debug: bool):
         self.workers = {}
         self.queues = []
         self.shutdown_event = Event()
@@ -193,7 +194,7 @@ class Runner:
         return not exc_type
 
     def stop_workers(self) -> Tuple[int, int]:
-        self.shutdown_event.set()  # type: ignore
+        self.shutdown_event.set()
         end_time = time.time() + STOP_WAIT_SECS
         num_terminated = 0
         num_failed = 0

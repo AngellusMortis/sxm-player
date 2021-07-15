@@ -1,3 +1,9 @@
+from sxm_player.workers.cli import CLIPlayerWorker
+from sxm_player.workers.hls import HLSWorker
+from sxm_player.workers.processor import ProcessorWorker
+from sxm_player.workers.server import ServerWorker
+from sxm_player.workers.status import StatusWorker
+
 from .archiver import ArchiveWorker
 from .base import (
     BaseWorker,
@@ -10,15 +16,10 @@ from .base import (
     SXMLoopedWorker,
     SXMStatusSubscriber,
 )
-from .cli import CLIPlayerWorker
-from .hls import HLSWorker
-from .processor import ProcessorWorker
-from .server import ServerWorker
-from .status import StatusWorker
 
 # debug.py is not included in published package
 try:
-    from ..debug.worker import DebugWorker
+    from sxm_player.debug.worker import DebugWorker
 except ImportError:
     DebugWorker = None  # type: ignore
 

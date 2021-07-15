@@ -4,16 +4,16 @@ from typing import Dict, List, Optional, Union
 
 from sxm.models import XMCutMarker, XMEpisodeMarker, XMSong
 
-from ..models import Episode, Song
-from ..utils import (
+from sxm_player.models import Episode, Song
+from sxm_player.utils import (
     get_air_time,
     get_art_thumb_url,
     get_art_url_by_size,
     get_files,
     splice_file,
 )
-from .archiver import ARCHIVE_CHUNK
-from .base import HLSLoopedWorker
+from sxm_player.workers.archiver import ARCHIVE_CHUNK
+from sxm_player.workers.base import HLSLoopedWorker
 
 __all__ = ["ProcessorWorker"]
 
@@ -161,9 +161,10 @@ class ProcessorWorker(HLSLoopedWorker):
                 folder = os.path.join(folder, album_or_show)
 
             os.makedirs(folder, exist_ok=True)
-            path = os.path.join(folder, filename)
+            path: Optional[str] = os.path.join(folder, filename)
             self._log.debug(f"{cut.duration}: {path}")
-            path = splice_file(archive, path, start, end)  # type: ignore
+            if path is not None:
+                path = splice_file(archive, path, start, end)
 
             if path is not None:
                 if os.path.getsize(path) < 1000:

@@ -7,9 +7,11 @@ History
 
 (WIP -- Pending)
 
-* Replaces requests with httpx
+* Replaces setuptools with filt
 * Updates linting
 * Replaces TravisCI with Github Actions
+* Replaces requests with httpx
+* Replaces click with typer
 
 0.1.0 (2018-12-25)
 ------------------

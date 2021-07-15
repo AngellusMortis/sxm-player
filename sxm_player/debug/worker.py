@@ -1,8 +1,8 @@
 import os
 from bdb import BdbQuit
 
-from ..queue import Event, EventMessage
-from ..workers.base import InterruptableWorker
+from sxm_player.queue import Event, EventMessage
+from sxm_player.workers.base import InterruptableWorker
 
 __all__ = ["DebugWorker"]
 

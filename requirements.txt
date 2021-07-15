@@ -11,9 +11,7 @@ backcall==0.2.0
 certifi==2021.5.30
     # via httpx
 click==7.1.2
-    # via
-    #   sxm_player (pyproject.toml)
-    #   typer
+    # via typer
 coloredlogs==15.0.1
     # via sxm_player (pyproject.toml)
 decorator==5.0.9
@@ -73,7 +71,7 @@ sniffio==1.2.0
     #   httpx
 sqlalchemy==1.4.21
     # via sxm_player (pyproject.toml)
-sxm==0.2.2
+sxm==0.2.3
     # via sxm_player (pyproject.toml)
 tenacity==8.0.1
     # via sxm
@@ -82,7 +80,9 @@ traitlets==5.0.5
     #   ipython
     #   matplotlib-inline
 typer==0.3.2
-    # via sxm
+    # via
+    #   sxm
+    #   sxm_player (pyproject.toml)
 typing-extensions==3.10.0.0
     # via pydantic
 ua-parser==0.10.0

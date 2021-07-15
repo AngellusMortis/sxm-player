@@ -34,7 +34,7 @@ class StatusWorker(SXMLoopedWorker):
             self._log.debug("Checking SXM Client")
             r = httpx.get(f"http://{self._ip}:{self._port}/channels/")
 
-            if not r.ok:
+            if r.is_error:
                 # adjust delay to check more often
                 self._delay = 5.0
                 self._failures += 1

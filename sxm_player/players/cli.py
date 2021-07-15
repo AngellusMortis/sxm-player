@@ -2,14 +2,14 @@ from typing import List, Optional, Tuple, Type
 
 import click
 
-from ..models import PlayerState
-from ..runner import Runner
-from ..workers import BaseWorker, CLIPlayerWorker
-from .base import BasePlayer, Option
+from sxm_player.models import PlayerState
+from sxm_player.players.base import BasePlayer, Option
+from sxm_player.runner import Runner
+from sxm_player.workers import BaseWorker, CLIPlayerWorker
 
 
 class CLIPlayer(BasePlayer):
-    params = [
+    params: List[click.Parameter] = [
         Option(
             "--channel-id",
             required=True,
@@ -26,7 +26,7 @@ class CLIPlayer(BasePlayer):
 
     @staticmethod
     def get_params() -> List[click.Parameter]:
-        return CLIPlayer.params  # type: ignore
+        return CLIPlayer.params
 
     @staticmethod
     def get_worker_args(
@@ -35,10 +35,10 @@ class CLIPlayer(BasePlayer):
 
         context = click.get_current_context()
         params = {
-            "filename": context.params["filename"],
+            "filename": context.meta["filename"],
             "stream_protocol": "udp",
             "sxm_status": state.sxm_running,
-            "stream_data": (context.params["channel_id"], state.stream_url),
+            "stream_data": (context.meta["channel_id"], state.stream_url),
             "channels": state.get_raw_channels(),
             "raw_live_data": state.get_raw_live(),
         }

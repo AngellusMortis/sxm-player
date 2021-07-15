@@ -3,9 +3,9 @@ from typing import List, Optional, Tuple, Type
 
 import click
 
-from ..models import PlayerState
-from ..runner import Runner
-from ..workers import BaseWorker
+from sxm_player.models import PlayerState
+from sxm_player.runner import Runner
+from sxm_player.workers import BaseWorker
 
 
 class BasePlayer:

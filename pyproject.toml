@@ -9,14 +9,14 @@ author-email = "cbailey@mort.is"
 home-page = "https://github.com/AngellusMortis/sxm-player"
 requires-python='>=3.7'
 requires=[
-  'click>=7.0',
   'coloredlogs',
   'httpx',
   'ipython',
   'psutil',
   'pyyaml',
   'sqlalchemy',
-  'sxm>=0.2.2',
+  'sxm>=0.2.3',
+  'typer',
 ]
 
 description-file='README.rst'
@@ -71,10 +71,10 @@ dev = [
 ]
 
 [tool.flit.metadata.urls]
-Documentation = "https://sxm-client.readthedocs.io/en/latest/"
+Documentation = "https://sxm-player.readthedocs.io/en/latest/"
 
 [tool.flit.scripts]
-sxm-player = "sxm.cli:main"
+sxm-player = "sxm_player.__main__:start"
 
 [tool.flit.sdist]
 include = [

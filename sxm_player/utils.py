@@ -4,6 +4,7 @@ import os
 import select
 import shlex
 import subprocess  # nosec
+from pathlib import Path
 from typing import List, Optional, Union
 
 import coloredlogs  # type: ignore
@@ -13,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
 from sxm.models import XMArt, XMImage, XMMarker
 
-from .models import Episode, Song
+from sxm_player.models import Episode, Song
 
 ACTIVE_PROCESS_STATUSES = [
     psutil.STATUS_RUNNING,
@@ -149,7 +150,7 @@ def splice_file(
         return output_file
 
 
-def configure_root_logger(level: str, log_file: Optional[str] = None):
+def configure_root_logger(level: str, log_file: Optional[Path] = None):
     root_logger = logging.getLogger()
     if len(root_logger.handlers) == 0:
         if log_file is not None:
@@ -170,19 +171,17 @@ class FFmpeg:
     command: str
     process: Optional[subprocess.Popen] = None
 
-    _stderr_poll: Optional[select.poll] = None  # pylint: disable=E1101
+    _stderr_poll: Optional[select.poll] = None
 
     def start_ffmpeg(self) -> None:
         ffmpeg_args = shlex.split(self.command)
 
         self.process = subprocess.Popen(ffmpeg_args, stderr=subprocess.PIPE)  # nosec
 
-        self._stderr_poll = select.poll()  # pylint: disable=E1101
+        self._stderr_poll = select.poll()
 
         if self.process.stderr is not None:
-            self._stderr_poll.register(
-                self.process.stderr, select.POLLIN  # pylint: disable=E1101 # noqa
-            )
+            self._stderr_poll.register(self.process.stderr, select.POLLIN)
 
     def check_process(self) -> bool:
         if self.process is None:
