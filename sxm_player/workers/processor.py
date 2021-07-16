@@ -1,12 +1,13 @@
 import os
-import time
+from datetime import timedelta
+from time import monotonic
 from typing import Dict, List, Optional, Union
 
 from sxm.models import XMCutMarker, XMEpisodeMarker, XMSong
 
 from sxm_player.models import DBEpisode, DBSong
 from sxm_player.utils import (
-    get_air_time,
+    from_fs_datetime,
     get_art_thumb_url,
     get_art_url_by_size,
     get_files,
@@ -18,7 +19,7 @@ from sxm_player.workers.base import HLSLoopedWorker
 __all__ = ["ProcessorWorker"]
 
 MAX_DUPLICATE_COUNT = 3
-CUT_PADDING = 20
+CUT_PADDING = timedelta(seconds=20)
 
 
 class ProcessorWorker(HLSLoopedWorker):
@@ -26,7 +27,7 @@ class ProcessorWorker(HLSLoopedWorker):
 
     NAME = "processor"
 
-    _delay: float = ARCHIVE_CHUNK
+    _delay: float = ARCHIVE_CHUNK.total_seconds()
 
     def __init__(
         self,
@@ -42,7 +43,7 @@ class ProcessorWorker(HLSLoopedWorker):
         self.archive_folder = archive_folder
 
         # run in 90 seconds and run ~30 seconds after Archiver
-        self._last_loop = time.time() + 90 - ARCHIVE_CHUNK
+        self._last_loop = monotonic() + 90 - ARCHIVE_CHUNK.total_seconds()
         self._state.processed_folder = self.processed_folder
         self._state.db_reset = reset_songs
 
@@ -53,7 +54,7 @@ class ProcessorWorker(HLSLoopedWorker):
         os.makedirs(self.archive_folder, exist_ok=True)
 
     def loop(self) -> None:
-        self._delay = ARCHIVE_CHUNK
+        self._delay = ARCHIVE_CHUNK.total_seconds()
 
         if (
             self._state.stream_channel is None
@@ -108,19 +109,21 @@ class ProcessorWorker(HLSLoopedWorker):
             return False
 
         archive = None
-        start = int(cut.time / 1000) + CUT_PADDING
-        splice_start = start
-        padded_duration = int(cut.duration + CUT_PADDING)
+        start = cut.time + CUT_PADDING
+        splice_start = timedelta(seconds=0)
+        padded_duration = cut.duration + CUT_PADDING
         end = start + padded_duration
-        splice_end = end
+        splice_end = timedelta(seconds=0)
 
         for archive_key, archive_file in archives.items():
-            archive_start, archive_end = [int(i) for i in archive_key.split(".")]
+            archive_start, archive_end = [
+                from_fs_datetime(i) for i in archive_key.split(".")
+            ]
 
             if archive_start < start and archive_end > end:
                 archive = archive_file
                 splice_start = start - archive_start
-                splice_end = start + padded_duration
+                splice_end = splice_start + padded_duration
                 break
 
         if archive is not None:
@@ -132,8 +135,6 @@ class ProcessorWorker(HLSLoopedWorker):
             artist = None
             filename = None
             folder = os.path.join(self.processed_folder, self._state.stream_channel)
-
-            air_time = get_air_time(cut)
 
             if isinstance(cut, XMEpisodeMarker):
                 title = self._path_filter(
@@ -147,7 +148,7 @@ class ProcessorWorker(HLSLoopedWorker):
                     album_url = get_art_thumb_url(cut.episode.show.arts)
 
                 filename = (
-                    f'{title}.{air_time.strftime("%Y-%m-%d-%H.%M")}' f".{cut.guid}.mp3"
+                    f'{title}.{cut.time.strftime("%Y-%m-%d-%H.%M")}' f".{cut.guid}.mp3"
                 )
                 folder = os.path.join(folder, "shows")
             elif isinstance(cut.cut, XMSong):
@@ -174,7 +175,12 @@ class ProcessorWorker(HLSLoopedWorker):
                     f"Splice song: (Song: {start}, {end}, {cut.duration}), "
                     f"(Archive: {archive}, {splice_start}, {splice_end}"
                 )
-                path = splice_file(archive, path, splice_start, splice_end)
+                path = splice_file(
+                    archive,
+                    path,
+                    int(splice_start.total_seconds()),
+                    int(splice_end.total_seconds()),
+                )
 
             if path is not None:
                 if os.path.getsize(path) < 1000:
@@ -190,7 +196,7 @@ class ProcessorWorker(HLSLoopedWorker):
                         guid=cut.guid,
                         title=title,
                         show=album_or_show,
-                        air_time=air_time,
+                        air_time=cut.time,
                         channel=self._state.stream_channel,
                         file_path=path,
                         image_url=album_url,
@@ -202,7 +208,7 @@ class ProcessorWorker(HLSLoopedWorker):
                         title=title,
                         artist=artist,
                         album=album_or_show,
-                        air_time=air_time,
+                        air_time=cut.time,
                         channel=self._state.stream_channel,
                         file_path=path,
                         image_url=album_url,

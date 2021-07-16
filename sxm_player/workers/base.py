@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime, timedelta
 from multiprocessing import synchronize
 from typing import List, Optional, Tuple
 
@@ -135,9 +136,9 @@ class EventedWorker(LoopedWorker):
                         )
                         self._handle_event(event)
 
-                if time.time() > (self._last_loop + self._delay):
+                if time.monotonic() > (self._last_loop + self._delay):
                     self.loop()
-                    self._last_loop = time.time()
+                    self._last_loop = time.monotonic()
         except Exception as e:
             self._log.error(f"Exception occurred in {self.name}: {e}")
 
@@ -175,7 +176,9 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
         self,
         stream_data: Tuple[Optional[str], Optional[str]] = (None, None),
         channels: Optional[List[dict]] = None,
-        raw_live_data: Tuple[Optional[float], Optional[float], Optional[dict]] = (
+        raw_live_data: Tuple[
+            Optional[datetime], Optional[timedelta], Optional[dict]
+        ] = (
             None,
             None,
             None,
@@ -216,7 +219,7 @@ class ComboLoopedWorker(EventedWorker, SXMStatusSubscriber, HLSStatusSubscriber)
         self,
         sxm_status: bool,
         stream_data: Tuple[Optional[str], Optional[str]],
-        raw_live_data: Tuple[Optional[float], Optional[float], Optional[dict]],
+        raw_live_data: Tuple[Optional[datetime], Optional[timedelta], Optional[dict]],
         *args,
         **kwargs,
     ):

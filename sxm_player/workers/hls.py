@@ -96,7 +96,7 @@ class HLSWorker(SXMLoopedWorker, FFmpeg):
         return (playback_url, output_options)
 
     def setup(self):
-        self._start = time.time()
+        self._start = time.monotonic()
 
         self.push_event(
             EventMessage(
@@ -107,7 +107,7 @@ class HLSWorker(SXMLoopedWorker, FFmpeg):
         )
 
     def loop(self):
-        now = time.time()
+        now = time.monotonic()
 
         if not self._state.sxm_running:
             self._log.info(f"SXM Client is dead, stopping {self.name}")

@@ -15,7 +15,7 @@ STARTUP_WAIT_SECS = 10.0
 
 def _sleep_secs(max_sleep, end_time=999_999_999_999_999.9):
     # Calculate time left to sleep, no less than 0
-    return max(0.0, min(end_time - time.time(), max_sleep))
+    return max(0.0, min(end_time - time.monotonic(), max_sleep))
 
 
 def worker_wrapper(
@@ -195,7 +195,7 @@ class Runner:
 
     def stop_workers(self) -> Tuple[int, int]:
         self.shutdown_event.set()
-        end_time = time.time() + STOP_WAIT_SECS
+        end_time = time.monotonic() + STOP_WAIT_SECS
         num_terminated = 0
         num_failed = 0
 

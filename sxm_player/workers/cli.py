@@ -51,7 +51,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
     def _invalid_stream_loop(self):
         if self.process is None:
             if self._state.sxm_running and self._state.stream_url is None:
-                now = time.time()
+                now = time.monotonic()
                 if now > self._event_cooldown:
                     self._event_cooldown = now + 10
                     self._log.info(f"Starting new HLS stream: {self.channel_id}")

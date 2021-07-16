@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple, Union
 
 from pydantic import BaseModel, PrivateAttr  # pylint: disable=no-name-in-module
@@ -153,8 +153,8 @@ class PlayerState(BaseModel):
     _failures: int = PrivateAttr(0)
     _cooldown: float = PrivateAttr(0)
     _last_failure: float = PrivateAttr(0)
-    _start_time: Optional[float] = PrivateAttr(None)
-    _time_offset: Optional[float] = PrivateAttr(None)
+    _start_time: Optional[datetime] = PrivateAttr(None)
+    _time_offset: Optional[timedelta] = PrivateAttr(None)
 
     @property
     def stream_data(self) -> Tuple[Optional[str], Optional[str]]:
@@ -208,7 +208,7 @@ class PlayerState(BaseModel):
     def update_live(self, value: dict) -> None:
         """Sets live key in internal `_raw_live`."""
 
-        now = int(time.time() * 1000)
+        now = datetime.now(timezone.utc)
         self._live = None
         self._raw_live = value
 
@@ -229,12 +229,12 @@ class PlayerState(BaseModel):
 
     def get_raw_live(
         self,
-    ) -> Tuple[Optional[float], Optional[float], Optional[dict]]:
+    ) -> Tuple[Optional[datetime], Optional[timedelta], Optional[dict]]:
         return (self._start_time, self._time_offset, self._raw_live)
 
     def set_raw_live(
         self,
-        live_data: Tuple[Optional[float], Optional[float], Optional[dict]],
+        live_data: Tuple[Optional[datetime], Optional[timedelta], Optional[dict]],
     ):
         self._start_time = live_data[0]
         self._time_offset = live_data[1]
@@ -244,20 +244,19 @@ class PlayerState(BaseModel):
             self._live = XMLiveChannel.from_dict(self._raw_live)
 
     @property
-    def radio_time(self) -> Union[int, None]:
+    def radio_time(self) -> Union[datetime, None]:
         """Returns current time for the radio"""
 
         if self.live is None:
             return None
 
-        now = int(time.time() * 1000)
-        # Does not seem to be accurate
-        # if self._time_offset is not None:
-        #     return now - int(self._time_offset)
+        now = datetime.now(timezone.utc)
+        if self._time_offset is not None:
+            return now - self._time_offset
         return now
 
     @property
-    def start_time(self) -> Union[float, None]:
+    def start_time(self) -> Optional[datetime]:
         """Returns the start time for the current SiriusXM channel"""
 
         if self.live is None:
@@ -267,13 +266,13 @@ class PlayerState(BaseModel):
     @property
     def is_connected(self) -> bool:
         is_connected = self._raw_channels is not None
-        if is_connected and time.time() - self._last_failure > 300:
+        if is_connected and time.monotonic() - self._last_failure > 300:
             self._failures = 0
         return is_connected
 
     @property
     def can_connect(self) -> bool:
-        return time.time() > self._cooldown
+        return time.monotonic() > self._cooldown
 
     def mark_attempt(self, logger: logging.Logger) -> float:
         if self.can_connect:
@@ -295,13 +294,13 @@ class PlayerState(BaseModel):
         else:
             extra_seconds = COOLDOWN_LONG
 
-        self._cooldown = time.time() + extra_seconds
+        self._cooldown = time.monotonic() + extra_seconds
 
         return extra_seconds
 
     def mark_failure(self) -> float:
         self._failures += 1
-        self._last_failure = time.time()
+        self._last_failure = time.monotonic()
         return self._cooldown
 
     def get_channel(self, name: str) -> Union[XMChannel, None]:

@@ -29,7 +29,7 @@ class EventMessage:
     msg: Any
 
     def __init__(self, msg_src, msg_type, msg, msg_relay=None):
-        self.id = time.time()
+        self.id = time.monotonic()
         self.msg_src = msg_src
         self.msg_relay = msg_relay
         self.msg_type = msg_type

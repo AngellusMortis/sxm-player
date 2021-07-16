@@ -1,16 +1,17 @@
 import os
-import time
+from datetime import datetime, timedelta, timezone
+from time import monotonic
 from typing import Dict, Optional, Tuple, Union
 
 from sxm_player.queue import Event, EventMessage
-from sxm_player.utils import get_files, splice_file
+from sxm_player.utils import create_fs_datetime, get_files, splice_file
 from sxm_player.workers.base import HLSLoopedWorker
 
 __all__ = ["ArchiveWorker"]
 
-ARCHIVE_DROPOFF: int = 86400  # 24 hours
-ARCHIVE_CHUNK = 600.0  # 10 minutes
-ARCHIVE_BUFFER = 5
+ARCHIVE_DROPOFF = timedelta(hours=24)
+ARCHIVE_CHUNK = timedelta(minutes=10)
+ARCHIVE_BUFFER = timedelta(seconds=5)
 
 
 class ArchiveWorker(HLSLoopedWorker):
@@ -20,14 +21,14 @@ class ArchiveWorker(HLSLoopedWorker):
     archive_folder: str
     last_size: Dict[str, int] = {}
 
-    _delay: float = ARCHIVE_CHUNK
+    _delay: float = ARCHIVE_CHUNK.total_seconds()
 
     def __init__(self, stream_folder: str, archive_folder: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # run in 11 minutes (ARCHIVE_CHUNK + 1 minute) to ensure a
         # full 10 minutes of audio exists
-        self._last_loop = time.time() + 60
+        self._last_loop = monotonic() + 60
 
         self.stream_folder = stream_folder
         self.archive_folder = archive_folder
@@ -98,11 +99,15 @@ class ArchiveWorker(HLSLoopedWorker):
 
         archive_files = get_files(archive_folder)
 
-        now: float = time.time()
+        now = datetime.now(timezone.utc)
         removed: int = 0
         for archive_file in archive_files:
             abs_path = os.path.join(archive_folder, archive_file)
-            age: float = now - os.path.getatime(abs_path)
+            access_time = datetime.fromtimestamp(os.path.getatime(abs_path)).replace(
+                tzinfo=timezone.utc
+            )
+
+            age = now - access_time
             if (
                 archive_file.startswith(archive_base) and archive_file != current_file
             ) or age > ARCHIVE_DROPOFF:
@@ -121,23 +126,25 @@ class ArchiveWorker(HLSLoopedWorker):
             return (None, 0)
         channel_archive = os.path.join(self.archive_folder, channel_id)
 
-        max_archive_cutoff = int(time.time()) - ARCHIVE_BUFFER
-        creation_time = int(os.path.getatime(abs_path)) + ARCHIVE_BUFFER
+        now = self._state.radio_time or datetime.now(timezone.utc)
+        start_time = self._state.start_time or datetime.fromtimestamp(
+            os.path.getatime(abs_path)
+        ).replace(tzinfo=timezone.utc)
 
-        # not reliable enough yet
-        # max_archive_cutoff = \
-        #     int(self.state.radio_time / 1000) - ARCHIVE_BUFFER
-        # creation_time = int(self.state.start_time / 1000) + ARCHIVE_BUFFER
+        max_archive_cutoff = now - ARCHIVE_BUFFER
+        creation_time = start_time + ARCHIVE_BUFFER
 
         time_elapsed = max_archive_cutoff - creation_time
         archive_chunks = int(time_elapsed / ARCHIVE_CHUNK)
         if archive_chunks > 0:
             os.makedirs(channel_archive, exist_ok=True)
-            time_elapsed = int(archive_chunks * ARCHIVE_CHUNK)
+            time_elapsed = archive_chunks * ARCHIVE_CHUNK
             archive_cutoff = creation_time + time_elapsed
 
-            archive_base = f"{channel_id}.{creation_time}"
-            archive_filename = f"{archive_base}.{archive_cutoff}.mp3"
+            archive_base = f"{channel_id}.{create_fs_datetime(creation_time)}"
+            archive_filename = (
+                f"{archive_base}.{create_fs_datetime(archive_cutoff)}.mp3"
+            )
             archive_output = os.path.join(channel_archive, archive_filename)
             if os.path.exists(archive_output):
                 return (None, 0)
@@ -149,8 +156,8 @@ class ArchiveWorker(HLSLoopedWorker):
                 splice_file(
                     abs_path,
                     archive_output,
-                    ARCHIVE_BUFFER,
-                    ARCHIVE_BUFFER + time_elapsed,
+                    int(ARCHIVE_BUFFER.total_seconds()),
+                    int((ARCHIVE_BUFFER + time_elapsed).total_seconds()),
                 ),
                 removed,
             )

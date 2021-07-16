@@ -8,10 +8,12 @@ from typing import Optional, Type
 
 import psutil
 import typer
+from sxm import QualitySize, RegionChoice
 from sxm.cli import (
     OPTION_HOST,
     OPTION_PASSWORD,
     OPTION_PORT,
+    OPTION_QUALITY,
     OPTION_REGION,
     OPTION_USERNAME,
     OPTION_VERBOSE,
@@ -77,7 +79,8 @@ def main(
     verbose: bool = OPTION_VERBOSE,
     username: str = OPTION_USERNAME,
     password: str = OPTION_PASSWORD,
-    region: str = OPTION_REGION,
+    region: RegionChoice = OPTION_REGION,
+    quality: QualitySize = OPTION_QUALITY,
     port: int = OPTION_PORT,
     host: str = OPTION_HOST,
     output_folder: Optional[Path] = OPTION_OUTPUT_FOLDER,
@@ -124,7 +127,8 @@ def spawn_sxm_worker(
     port: int,
     username: str,
     password: str,
-    region: str,
+    region: RegionChoice,
+    quality: QualitySize,
     **kwargs,
 ):
     runner.create_worker(
@@ -135,6 +139,7 @@ def spawn_sxm_worker(
         username=username,
         password=password,
         region=region,
+        quality=quality,
     )
 
 

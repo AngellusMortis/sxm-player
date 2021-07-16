@@ -236,7 +236,7 @@ def handle_update_metadata_event(
 ):
     """event.msg == (state.get_raw_live())"""
 
-    state.stream_channel = event.msg["channelId"]
+    state.stream_channel = event.msg["moduleResponse"]["liveChannelData"]["channelId"]
     state.update_live(event.msg)
     hls_metadata_event(runner, state.get_raw_live(), src=event.msg_src)
 

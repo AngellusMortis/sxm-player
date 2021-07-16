@@ -1,9 +1,9 @@
-import datetime
 import logging
 import os
 import select
 import shlex
 import subprocess  # nosec
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -12,7 +12,7 @@ import psutil
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
-from sxm.models import XMArt, XMImage, XMMarker
+from sxm.models import XMArt, XMImage
 
 from sxm_player.models import DBEpisode, DBSong
 
@@ -21,6 +21,7 @@ ACTIVE_PROCESS_STATUSES = [
     psutil.STATUS_SLEEPING,
     psutil.STATUS_DISK_SLEEP,
 ]
+FS_DATETIME_FORMAT = "%Y%m%d-%H%M%S%z"
 
 
 unrelated_loggers = [
@@ -73,18 +74,6 @@ def init_db(
 
     logger.info("Database initalized")
     return db_session
-
-
-def get_air_time(cut: XMMarker) -> datetime.datetime:
-    """Dates UTC datetime object for the air
-    date of a `XMMarker` to the hour"""
-
-    air_time = datetime.datetime.fromtimestamp(
-        int(cut.time / 1000), tz=datetime.timezone.utc
-    )
-    air_time = air_time.replace(minute=0, second=0, microsecond=0)
-
-    return air_time
 
 
 def get_art_url_by_size(arts: List[XMArt], size: str) -> Optional[str]:
@@ -150,6 +139,14 @@ def splice_file(
     else:
         logger.info(f"spliced file: {output_file}")
         return output_file
+
+
+def create_fs_datetime(dt):
+    return dt.strftime(FS_DATETIME_FORMAT)
+
+
+def from_fs_datetime(dt_string):
+    return datetime.strptime(dt_string, FS_DATETIME_FORMAT)
 
 
 def configure_root_logger(level: str, log_file: Optional[Path] = None):

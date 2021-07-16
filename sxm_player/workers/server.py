@@ -2,7 +2,7 @@ import logging
 from typing import Callable
 
 from aiohttp import web
-from sxm import SXMClient, make_http_handler
+from sxm import QualitySize, RegionChoice, SXMClient, make_http_handler
 
 from ..queue import Event, EventMessage
 from ..signals import TerminateInterrupt
@@ -26,7 +26,8 @@ class ServerWorker(InterruptableWorker):
         ip: str,
         username: str,
         password: str,
-        region: str,
+        region: RegionChoice,
+        quality: QualitySize,
         *args,
         **kwargs,
     ):
@@ -39,10 +40,12 @@ class ServerWorker(InterruptableWorker):
             username=username,
             password=password,
             region=region,
+            quality=quality,
             update_handler=self._make_update_handler(),
         )
 
         self.sxm.authenticate()
+        self.sxm.configuration
 
     def _make_update_handler(self) -> Callable[[dict], None]:
         """Returns update handler to be called by
