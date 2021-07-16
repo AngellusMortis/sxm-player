@@ -18,6 +18,7 @@ from sxm_player.workers.base import HLSLoopedWorker
 __all__ = ["ProcessorWorker"]
 
 MAX_DUPLICATE_COUNT = 3
+CUT_PADDING = 20
 
 
 class ProcessorWorker(HLSLoopedWorker):
@@ -107,17 +108,19 @@ class ProcessorWorker(HLSLoopedWorker):
             return False
 
         archive = None
-        start = int(cut.time / 1000) + 20
-        padded_duration = int(cut.duration + 20)
+        start = int(cut.time / 1000) + CUT_PADDING
+        splice_start = start
+        padded_duration = int(cut.duration + CUT_PADDING)
         end = start + padded_duration
+        splice_end = end
 
         for archive_key, archive_file in archives.items():
             archive_start, archive_end = [int(i) for i in archive_key.split(".")]
 
             if archive_start < start and archive_end > end:
                 archive = archive_file
-                start = start - archive_start
-                end = start + padded_duration
+                splice_start = start - archive_start
+                splice_end = start + padded_duration
                 break
 
         if archive is not None:
@@ -167,7 +170,11 @@ class ProcessorWorker(HLSLoopedWorker):
             path: Optional[str] = os.path.join(folder, filename)
             self._log.debug(f"{cut.duration}: {path}")
             if path is not None:
-                path = splice_file(archive, path, start, end)
+                self._log.debug(
+                    f"Splice song: (Song: {start}, {end}, {cut.duration}), "
+                    f"(Archive: {archive}, {splice_start}, {splice_end}"
+                )
+                path = splice_file(archive, path, splice_start, splice_end)
 
             if path is not None:
                 if os.path.getsize(path) < 1000:

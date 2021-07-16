@@ -4,6 +4,8 @@
 #
 #    pip-compile --extra=dev --extra=doc --extra=test --output-file=dev-requirements.txt pyproject.toml
 #
+aiohttp==3.7.4.post0
+    # via sxm
 alabaster==0.7.12
     # via sphinx
 anyio==3.2.1
@@ -12,8 +14,11 @@ appdirs==1.4.4
     # via black
 astroid==2.6.2
     # via pylint
+async-timeout==3.0.1
+    # via aiohttp
 attrs==21.2.0
     # via
+    #   aiohttp
     #   flake8-bugbear
     #   pytest
 babel==2.9.1
@@ -32,6 +37,8 @@ certifi==2021.5.30
     # via
     #   httpx
     #   requests
+chardet==4.0.0
+    # via aiohttp
 charset-normalizer==2.0.2
     # via requests
 click==7.1.2
@@ -116,6 +123,7 @@ idna==3.2
     #   anyio
     #   requests
     #   rfc3986
+    #   yarl
 imagesize==1.2.0
     # via sphinx
 iniconfig==1.1.1
@@ -134,6 +142,8 @@ jinja2==3.0.1
     # via sphinx
 lazy-object-proxy==1.6.0
     # via astroid
+make-it-sync==1.0.0
+    # via sxm
 markupsafe==2.0.1
     # via jinja2
 matplotlib-inline==0.1.2
@@ -142,6 +152,10 @@ mccabe==0.6.1
     # via
     #   flake8
     #   pylint
+multidict==5.1.0
+    # via
+    #   aiohttp
+    #   yarl
 mypy==0.910
     # via
     #   sqlalchemy-stubs
@@ -194,11 +208,8 @@ pycodestyle==2.7.0
     # via flake8
 pydantic==1.8.2
     # via
-    #   pydantic-sqlalchemy
     #   sxm
     #   sxm_player (pyproject.toml)
-pydantic-sqlalchemy==0.0.9
-    # via sxm_player (pyproject.toml)
 pyflakes==2.3.1
     # via flake8
 pygments==2.9.0
@@ -288,14 +299,12 @@ sphinxcontrib-qthelp==1.0.3
 sphinxcontrib-serializinghtml==1.1.5
     # via sphinx
 sqlalchemy==1.4.21
-    # via
-    #   pydantic-sqlalchemy
-    #   sxm_player (pyproject.toml)
+    # via sxm_player (pyproject.toml)
 sqlalchemy-stubs==0.4
     # via sxm_player (pyproject.toml)
 stevedore==3.3.0
     # via bandit
-sxm==0.2.3
+sxm==0.2.4
     # via sxm_player (pyproject.toml)
 tenacity==8.0.1
     # via sxm
@@ -332,6 +341,7 @@ types-pyyaml==5.4.3
     # via sxm_player (pyproject.toml)
 typing-extensions==3.7.4.3
     # via
+    #   aiohttp
     #   mypy
     #   pydantic
     #   snooty-lextudio
@@ -353,6 +363,8 @@ wheel==0.36.2
     # via pip-tools
 wrapt==1.12.1
     # via astroid
+yarl==1.6.3
+    # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip

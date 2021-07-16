@@ -1,7 +1,7 @@
 import logging
-from http.server import HTTPServer
 from typing import Callable
 
+from aiohttp import web
 from sxm import SXMClient, make_http_handler
 
 from ..queue import Event, EventMessage
@@ -64,15 +64,19 @@ class ServerWorker(InterruptableWorker):
         self.send_channel_list()
 
         request_logger = logging.getLogger("sxm_player.server.request")
+        request_logger._info = request_logger.info  # type: ignore
+        request_logger.info = request_logger.debug  # type: ignore
 
-        httpd = HTTPServer(
-            (self._ip, self._port),
-            make_http_handler(self.sxm, request_logger, request_level=logging.DEBUG),
-        )
+        app = web.Application()
+        app.router.add_get("/{_:.*}", make_http_handler(self.sxm.async_client))
         try:
             self._log.info(f"{self.name} has started on http://{self._ip}:{self._port}")
-            httpd.serve_forever()
+            web.run_app(
+                app,
+                host=self._ip,
+                port=self._port,
+                access_log=request_logger,
+                print=None,  # type: ignore
+            )
         except (KeyboardInterrupt, TerminateInterrupt):
             pass
-
-        httpd.server_close()

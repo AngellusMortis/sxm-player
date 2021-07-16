@@ -10,7 +10,7 @@ History
 * Replaces TravisCI with Github Actions
 * Replaces requests with httpx
 * Replaces click with typer
-* Adds Pydantic PlayerState, Song and Episode models
+* Adds Pydantic `PlayerState`, `Song` and `Episode` models
 
 0.1.0 (2018-12-25)
 ------------------

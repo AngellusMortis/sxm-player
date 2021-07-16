@@ -4,12 +4,20 @@
 #
 #    pip-compile --output-file=requirements.txt pyproject.toml
 #
+aiohttp==3.7.4.post0
+    # via sxm
 anyio==3.2.1
     # via httpcore
+async-timeout==3.0.1
+    # via aiohttp
+attrs==21.2.0
+    # via aiohttp
 backcall==0.2.0
     # via ipython
 certifi==2021.5.30
     # via httpx
+chardet==4.0.0
+    # via aiohttp
 click==7.1.2
     # via typer
 coloredlogs==15.0.1
@@ -34,14 +42,21 @@ idna==3.2
     # via
     #   anyio
     #   rfc3986
+    #   yarl
 ipython==7.25.0
     # via sxm_player (pyproject.toml)
 ipython-genutils==0.2.0
     # via traitlets
 jedi==0.18.0
     # via ipython
+make-it-sync==1.0.0
+    # via sxm
 matplotlib-inline==0.1.2
     # via ipython
+multidict==5.1.0
+    # via
+    #   aiohttp
+    #   yarl
 parso==0.8.2
     # via jedi
 pexpect==4.8.0
@@ -56,11 +71,8 @@ ptyprocess==0.7.0
     # via pexpect
 pydantic==1.8.2
     # via
-    #   pydantic-sqlalchemy
     #   sxm
     #   sxm_player (pyproject.toml)
-pydantic-sqlalchemy==0.0.9
-    # via sxm_player (pyproject.toml)
 pygments==2.9.0
     # via ipython
 python-dotenv==0.18.0
@@ -75,10 +87,8 @@ sniffio==1.2.0
     #   httpcore
     #   httpx
 sqlalchemy==1.4.21
-    # via
-    #   pydantic-sqlalchemy
-    #   sxm_player (pyproject.toml)
-sxm==0.2.3
+    # via sxm_player (pyproject.toml)
+sxm==0.2.4
     # via sxm_player (pyproject.toml)
 tenacity==8.0.1
     # via sxm
@@ -91,11 +101,15 @@ typer==0.3.2
     #   sxm
     #   sxm_player (pyproject.toml)
 typing-extensions==3.10.0.0
-    # via pydantic
+    # via
+    #   aiohttp
+    #   pydantic
 ua-parser==0.10.0
     # via sxm
 wcwidth==0.2.5
     # via prompt-toolkit
+yarl==1.6.3
+    # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
