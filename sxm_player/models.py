@@ -251,8 +251,9 @@ class PlayerState(BaseModel):
             return None
 
         now = int(time.time() * 1000)
-        if self._time_offset is not None:
-            return now - int(self._time_offset)
+        # Does not seem to be accurate
+        # if self._time_offset is not None:
+        #     return now - int(self._time_offset)
         return now
 
     @property
