@@ -10,11 +10,11 @@ name: Upload Python Package
 
 on:
   release:
-    types: [published]
+    types: [ published ]
 
 jobs:
   deploy:
-
+    name: Publish to PyPi
     runs-on: ubuntu-latest
 
     steps:
