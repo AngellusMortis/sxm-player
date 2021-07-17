@@ -28,7 +28,7 @@ function setLintModules() {
     if [[ -f "$ROOT_PATH/conftest.py" ]]; then
         echo "Found \`conftest.py\`"
         BANDIT_MODULES="conftest"
-        PYLINT_MODULES="contest.py"
+        PYLINT_MODULES="conftest.py"
     fi
 
     if [[ -d "$ROOT_PATH/tests" ]]; then

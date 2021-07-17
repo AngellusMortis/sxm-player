@@ -1,7 +1,7 @@
 import os
 from bdb import BdbQuit
 
-from sxm_player.queue import Event, EventMessage
+from sxm_player.queue import EventMessage, EventTypes
 from sxm_player.workers.base import InterruptableWorker
 
 __all__ = ["DebugWorker"]
@@ -32,21 +32,25 @@ class DebugWorker(InterruptableWorker):
         self.push_event(
             EventMessage(
                 self.name,
-                Event.DEBUG_START_PLAYER,
+                EventTypes.DEBUG_START_PLAYER,
                 (player_name, channel_id, filename, protocol),
             )
         )
 
     def stop_player(self, player_name, kill_hls=True):
-        self.push_event(EventMessage(self.name, Event.DEBUG_STOP_PLAYER, player_name))
+        self.push_event(
+            EventMessage(self.name, EventTypes.DEBUG_STOP_PLAYER, player_name)
+        )
 
         if kill_hls:
             self.kill_hls()
 
     def trigger_hls(self, channel_id, protocol="udp"):
         self.push_event(
-            EventMessage(self.name, Event.TRIGGER_HLS_STREAM, (channel_id, protocol))
+            EventMessage(
+                self.name, EventTypes.TRIGGER_HLS_STREAM, (channel_id, protocol)
+            )
         )
 
     def kill_hls(self):
-        self.push_event(EventMessage(self.name, Event.KILL_HLS_STREAM, None))
+        self.push_event(EventMessage(self.name, EventTypes.KILL_HLS_STREAM, None))

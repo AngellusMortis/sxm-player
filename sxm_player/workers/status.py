@@ -1,6 +1,6 @@
 import httpx
 
-from ..queue import Event, EventMessage
+from ..queue import EventMessage, EventTypes
 from .base import SXMLoopedWorker
 
 __all__ = ["StatusWorker"]
@@ -40,11 +40,13 @@ class StatusWorker(SXMLoopedWorker):
                 self._failures += 1
                 if self._failures > 3:
                     self.push_event(
-                        EventMessage(self.name, Event.RESET_SXM, "bad status check")
+                        EventMessage(
+                            self.name, EventTypes.RESET_SXM, "bad status check"
+                        )
                     )
             else:
                 self._delay = 30.0
                 self._failures = 0
                 self.push_event(
-                    EventMessage(self.name, Event.UPDATE_CHANNELS, r.json())
+                    EventMessage(self.name, EventTypes.UPDATE_CHANNELS, r.json())
                 )

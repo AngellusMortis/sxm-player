@@ -5,7 +5,7 @@ from multiprocessing import synchronize
 from typing import List, Optional, Tuple
 
 from ..models import PlayerState
-from ..queue import Event, EventMessage, Queue
+from ..queue import EventMessage, EventTypes, Queue
 from ..signals import default_signal_handler, init_signals, interupt_signal_handler
 
 __all__ = [
@@ -161,7 +161,7 @@ class SXMLoopedWorker(EventedWorker, SXMStatusSubscriber):
         self._event_queues = [self.sxm_status_queue]
 
     def _handle_event(self, event: EventMessage):
-        if event.msg_type == Event.SXM_STATUS:
+        if event.msg_type == EventTypes.SXM_STATUS:
             self._state.sxm_running = event.msg
         else:
             self._log.warning(
@@ -198,13 +198,13 @@ class HLSLoopedWorker(EventedWorker, HLSStatusSubscriber):
         self._state.set_raw_live(raw_live_data)
 
     def _handle_event(self, event: EventMessage):
-        if event.msg_type == Event.HLS_STREAM_STARTED:
+        if event.msg_type == EventTypes.HLS_STREAM_STARTED:
             self._state.update_stream_data(event.msg)
-        elif event.msg_type == Event.UPDATE_METADATA:
+        elif event.msg_type == EventTypes.UPDATE_METADATA:
             self._state.set_raw_live(event.msg)
-        elif event.msg_type == Event.UPDATE_CHANNELS:
+        elif event.msg_type == EventTypes.UPDATE_CHANNELS:
             self._state.update_channels(event.msg)
-        elif event.msg_type == Event.KILL_HLS_STREAM:
+        elif event.msg_type == EventTypes.KILL_HLS_STREAM:
             self.local_shutdown_event.set()
         else:
             self._log.warning(

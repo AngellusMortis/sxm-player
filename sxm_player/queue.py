@@ -8,7 +8,7 @@ from typing import Any, Optional
 DEFAULT_POLLING_TIMEOUT = 0.02
 
 
-class Event(Enum):
+class EventTypes(Enum):
     RESET_SXM = auto()
     SXM_STATUS = auto()
     UPDATE_CHANNELS = auto()
@@ -25,7 +25,7 @@ class EventMessage:
     id: float  # noqa: A003
     msg_src: str
     msg_relay: str
-    msg_type: Event
+    msg_type: EventTypes
     msg: Any
 
     def __init__(self, msg_src, msg_type, msg, msg_relay=None):

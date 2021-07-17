@@ -2,6 +2,12 @@
 History
 =======
 
+0.2.1 (2021-08-17)
+------------------
+
+* Adds missing py.typed to add stubs
+* Renames `queue.Event` enum to `queue.EventTypes`
+
 0.2.0 (2021-08-15)
 ------------------
 

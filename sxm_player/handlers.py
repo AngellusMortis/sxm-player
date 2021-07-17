@@ -2,7 +2,7 @@ import os
 from typing import Optional
 
 from sxm_player.models import PlayerState
-from sxm_player.queue import Event, EventMessage
+from sxm_player.queue import EventMessage, EventTypes
 from sxm_player.runner import Runner, Worker
 from sxm_player.workers import (
     ArchiveWorker,
@@ -14,24 +14,24 @@ from sxm_player.workers import (
 
 
 def hls_start_event(runner: Runner, stream_data: tuple, src: Optional[str] = None):
-    hls_event(runner, Event.HLS_STREAM_STARTED, stream_data, src=src)
+    hls_event(runner, EventTypes.HLS_STREAM_STARTED, stream_data, src=src)
 
 
 def hls_kill_event(runner: Runner, src: Optional[str] = None):
-    hls_event(runner, Event.KILL_HLS_STREAM, None, src=src)
+    hls_event(runner, EventTypes.KILL_HLS_STREAM, None, src=src)
 
 
 def hls_metadata_event(runner: Runner, live_data: tuple, src: Optional[str] = None):
-    hls_event(runner, Event.UPDATE_METADATA, live_data, src=src)
+    hls_event(runner, EventTypes.UPDATE_METADATA, live_data, src=src)
 
 
 def hls_channels_event(
     runner: Runner, channels: Optional[list], src: Optional[str] = None
 ):
-    hls_event(runner, Event.UPDATE_CHANNELS, channels, src=src)
+    hls_event(runner, EventTypes.UPDATE_CHANNELS, channels, src=src)
 
 
-def hls_event(runner: Runner, event: Event, data, src: Optional[str] = None):
+def hls_event(runner: Runner, event: EventTypes, data, src: Optional[str] = None):
     for worker in runner.workers.values():
         if worker.hls_stream_queue is not None:
             if src is None:
@@ -51,7 +51,7 @@ def hls_event(runner: Runner, event: Event, data, src: Optional[str] = None):
 
 
 def sxm_status_event(
-    runner: Runner, event: Event, status: bool, src: Optional[str] = None
+    runner: Runner, event: EventTypes, status: bool, src: Optional[str] = None
 ):
     for worker in runner.workers.values():
         if worker.sxm_status_queue is not None:
@@ -107,7 +107,7 @@ def handle_reset_sxm_event(
         del runner.workers[ServerWorker.NAME]
 
         state.sxm_running = False
-        sxm_status_event(runner, Event.SXM_STATUS, state.sxm_running)
+        sxm_status_event(runner, EventTypes.SXM_STATUS, state.sxm_running)
 
 
 def handle_trigger_hls_stream_event(
@@ -134,13 +134,13 @@ def handle_trigger_hls_stream_event(
                 src_worker,
                 "hls_stream_queue",
                 EventMessage(
-                    event.msg_src, Event.HLS_STREAM_STARTED, state.stream_data
+                    event.msg_src, EventTypes.HLS_STREAM_STARTED, state.stream_data
                 ),
             )
             runner.log.info(
                 f"Could not start new {HLSWorker.NAME}, one is "
                 "already running passing "
-                f"{Event.HLS_STREAM_STARTED} instead"
+                f"{EventTypes.HLS_STREAM_STARTED} instead"
             )
         else:
             runner.log.warning(

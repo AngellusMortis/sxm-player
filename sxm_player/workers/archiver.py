@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from time import monotonic
 from typing import Dict, Optional, Tuple, Union
 
-from sxm_player.queue import Event, EventMessage
+from sxm_player.queue import EventMessage, EventTypes
 from sxm_player.utils import create_fs_datetime, get_files, splice_file
 from sxm_player.workers.base import HLSLoopedWorker
 
@@ -77,7 +77,7 @@ class ArchiveWorker(HLSLoopedWorker):
     def _validate_size(self, stream_file) -> bool:
         if not self._check_size(stream_file):
             self._log.error("archive not increasing, resetting channel")
-            self.push_event(EventMessage(self.name, Event.KILL_HLS_STREAM, None))
+            self.push_event(EventMessage(self.name, EventTypes.KILL_HLS_STREAM, None))
             return False
         return True
 

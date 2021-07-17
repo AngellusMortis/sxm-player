@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 
-from ..queue import Event, EventMessage
+from ..queue import EventMessage, EventTypes
 from ..utils import FFmpeg
 from .base import ComboLoopedWorker
 
@@ -58,7 +58,7 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
                     self.push_event(
                         EventMessage(
                             self.name,
-                            Event.TRIGGER_HLS_STREAM,
+                            EventTypes.TRIGGER_HLS_STREAM,
                             (self.channel_id, self.stream_protocol),
                         )
                     )
@@ -71,15 +71,15 @@ class CLIPlayerWorker(ComboLoopedWorker, FFmpeg):
         self._state.update_stream_data((None, None))
 
     def _handle_event(self, event: EventMessage):
-        if event.msg_type == Event.SXM_STATUS:
+        if event.msg_type == EventTypes.SXM_STATUS:
             self._state.sxm_running = event.msg
-        elif event.msg_type == Event.HLS_STREAM_STARTED:
+        elif event.msg_type == EventTypes.HLS_STREAM_STARTED:
             self._state.update_stream_data(event.msg)
-        elif event.msg_type == Event.UPDATE_METADATA:
+        elif event.msg_type == EventTypes.UPDATE_METADATA:
             self._state.set_raw_live(event.msg)
-        elif event.msg_type == Event.UPDATE_CHANNELS:
+        elif event.msg_type == EventTypes.UPDATE_CHANNELS:
             self._state.update_channels(event.msg)
-        elif event.msg_type == Event.KILL_HLS_STREAM:
+        elif event.msg_type == EventTypes.KILL_HLS_STREAM:
             self._log.info("stream is stopping, killing ffmpeg")
             self.cleanup()
         else:

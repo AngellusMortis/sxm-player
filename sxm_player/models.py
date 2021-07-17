@@ -303,7 +303,7 @@ class PlayerState(BaseModel):
         self._last_failure = time.monotonic()
         return self._cooldown
 
-    def get_channel(self, name: str) -> Union[XMChannel, None]:
+    def get_channel(self, name: str) -> Optional[XMChannel]:
         """Returns channel from list of `channels` with given name"""
 
         name = name.lower()
@@ -311,7 +311,7 @@ class PlayerState(BaseModel):
             if (
                 channel.name.lower() == name
                 or channel.id.lower() == name
-                or channel.channel_number == name
+                or str(channel.channel_number) == name
             ):
                 return channel
         return None

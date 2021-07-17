@@ -4,7 +4,7 @@ from typing import Callable
 from aiohttp import web
 from sxm import QualitySize, RegionChoice, SXMClient, make_http_handler
 
-from ..queue import Event, EventMessage
+from ..queue import EventMessage, EventTypes
 from ..signals import TerminateInterrupt
 from .base import InterruptableWorker
 
@@ -52,14 +52,14 @@ class ServerWorker(InterruptableWorker):
         `SXMClient.get_playlist` when a HLS playlist updates"""
 
         def update_handler(data: dict) -> None:
-            self.push_event(EventMessage(self.name, Event.UPDATE_METADATA, data))
+            self.push_event(EventMessage(self.name, EventTypes.UPDATE_METADATA, data))
 
         return update_handler
 
     def send_channel_list(self):
         channels = self.sxm.get_channels()
 
-        self.push_event(EventMessage(self.name, Event.UPDATE_CHANNELS, channels))
+        self.push_event(EventMessage(self.name, EventTypes.UPDATE_CHANNELS, channels))
 
     def run(self) -> None:
         """Runs SXM proxy server"""

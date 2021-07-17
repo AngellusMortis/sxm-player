@@ -85,7 +85,7 @@ include = [
   "HISTORY.rst",
   "LICENSE",
   "README.rst",
-  "sxm/*",
+  "sxm_player/*",
   "tests/*",
   "docs/*.rst",
   "docs/conf.py",

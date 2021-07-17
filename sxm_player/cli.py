@@ -23,7 +23,7 @@ from sxm_player import handlers
 from sxm_player.command import validate_player
 from sxm_player.models import PlayerState
 from sxm_player.players import BasePlayer
-from sxm_player.queue import Event, EventMessage
+from sxm_player.queue import EventMessage, EventTypes
 from sxm_player.runner import Runner
 from sxm_player.utils import ACTIVE_PROCESS_STATUSES
 from sxm_player.workers import ServerWorker, StatusWorker
@@ -168,7 +168,7 @@ def event_loop(runner: Runner, state: PlayerState, **kwargs):
             )
 
             state.sxm_running = True
-            handlers.sxm_status_event(runner, Event.SXM_STATUS, state.sxm_running)
+            handlers.sxm_status_event(runner, EventTypes.SXM_STATUS, state.sxm_running)
 
     check_player(runner, state)
 

@@ -3,7 +3,7 @@ import tempfile
 import time
 from typing import Optional, Tuple
 
-from ..queue import Event, EventMessage
+from ..queue import EventMessage, EventTypes
 from ..utils import FFmpeg
 from .base import SXMLoopedWorker
 
@@ -101,7 +101,7 @@ class HLSWorker(SXMLoopedWorker, FFmpeg):
         self.push_event(
             EventMessage(
                 self.name,
-                Event.HLS_STREAM_STARTED,
+                EventTypes.HLS_STREAM_STARTED,
                 (self.channel_id, self.playback_url),
             )
         )
@@ -130,9 +130,11 @@ class HLSWorker(SXMLoopedWorker, FFmpeg):
 
         if len(lines) > 0:
             self._log.debug(f"adding {len(lines)} of stderr to shared memory")
-            self.push_event(EventMessage(self.name, Event.HLS_STDERROR_LINES, lines))
+            self.push_event(
+                EventMessage(self.name, EventTypes.HLS_STDERROR_LINES, lines)
+            )
 
     def cleanup(self):
         self.stop_ffmpeg()
 
-        self.push_event(EventMessage(self.name, Event.KILL_HLS_STREAM, None))
+        self.push_event(EventMessage(self.name, EventTypes.KILL_HLS_STREAM, None))
