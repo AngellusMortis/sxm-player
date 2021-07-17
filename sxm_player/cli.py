@@ -69,7 +69,10 @@ OPTION_RESET_SONGS = typer.Option(
     help="Reset processed song database",
 )
 ARG_PLAYER_CLASS = typer.Argument(
-    None, callback=validate_player, help="Optional Player Class to use"
+    None,
+    callback=validate_player,
+    help="Optional Player Class to use",
+    envvar="SXM_PLAYER_CLASS",
 )
 
 
