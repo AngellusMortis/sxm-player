@@ -5,10 +5,14 @@ set -o pipefail
 set -o nounset
 
 BASE_DIR=$( realpath $( dirname "${BASH_SOURCE[0]}" )/../ )
+source "$BASE_DIR/.bin/lib/common.sh"
+setRoot
 
 pushd "$BASE_DIR" 2>&1 >/dev/null
 
 pip-compile --upgrade --output-file=requirements.txt pyproject.toml
 pip-compile --upgrade --extra=dev --extra=doc --extra=test --output-file=dev-requirements.txt pyproject.toml
+
+flit install --symlink
 
 popd 2>&1 >/dev/null

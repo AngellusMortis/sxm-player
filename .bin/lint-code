@@ -1,8 +1,10 @@
 #!/bin/bash
 
 BASE_DIR=$( realpath $( dirname "${BASH_SOURCE[0]}" )/../ )
+source "$BASE_DIR/.bin/lib/common.sh"
+setLintModules
 
-pushd "$BASE_DIR" 2>&1 >/dev/null
+pushd "$ROOT_PATH" 2>&1 >/dev/null
 
 echo "Running isort..."
 isort -c .
@@ -28,13 +30,13 @@ exit_code=$?
 echo
 
 echo "Running bandit..."
-bandit -c .bandit.yml -r sxm_player/
+bandit -c .bandit.yml -r $BANDIT_MODULES
 test $? -eq 0 -a $exit_code -eq 0
 exit_code=$?
 echo
 
 echo "Running pylint..."
-pylint sxm_player
+pylint $PYLINT_MODULES
 test $? -eq 0 -a $exit_code -eq 0
 exit_code=$?
 echo

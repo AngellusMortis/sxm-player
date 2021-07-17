@@ -31,6 +31,7 @@ classifiers=[
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
 ]
+keywords = "sxm,SiriusXM,XM Radio"
 license="MIT license"
 
 [tool.flit.metadata.requires-extra]
