@@ -11,6 +11,12 @@ Usage
     attempt to priate music, or to try to make a profit off your subscription
     may result in you getting in legal trouble.
 
+Docker
+======
+
+If you perfer to use ``sxm-player`` via a Docker container, check out `sxm-docker`_.
+
+.. _sxm-docker: https://github.com/AngellusMortis/sxm-docker
 
 Command Line Interface
 ======================
