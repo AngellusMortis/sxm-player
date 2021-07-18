@@ -18,6 +18,10 @@ sxm-player
     :target: https://pypi.org/project/sxm-player/
     :alt: Latest PyPI version
 
+.. image:: https://img.shields.io/docker/pulls/angellusmortis/sxm-player.svg?style=flat-square
+    :target: https://hub.docker.com/r/angellusmortis/sxm-player/
+    :alt: Docker Pulls
+
 .. warning:: Designed for PERSONAL USE ONLY
 
     ``sxm-player`` is a 100% unofficial project and you use it at your own risk.
