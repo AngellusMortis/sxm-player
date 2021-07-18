@@ -20,11 +20,11 @@ sxm-player
 
 .. warning:: Designed for PERSONAL USE ONLY
 
-    `sxm-player` is a 100% unofficial project and you use it at your own risk.
+    ``sxm-player`` is a 100% unofficial project and you use it at your own risk.
     It is designed to be used for personal use with a small number of users
     listening to it at once. Similar to playing music over a speakers from the
-    radio directly. Using `sxm-player` in any corporate setting, to
-    attempt to priate music, or to try to make a profit off your subscription
+    radio directly. Using ``sxm-player`` in any corporate setting, to
+    attempt to pirate music, or to try to make a profit off your subscription
     may result in you getting in legal trouble.
 
 
@@ -40,16 +40,23 @@ Features
 
 * Provides a CLI SXM client
 * Can easily provide any SXM client via an anonymous HLS stream that can
-  be play on any comptaible remote client
+  be play on any compatible remote client
 * Provides CLI interface to play SXM channel to a MP3 file on disk
 * Can archive live streams from a channel and process any songs/shows from it
 * Pluggable API to allow you to create your own SXM clients on top of it
+
+Docker
+------
+
+If you perfer to use ``sxm-player`` via a Docker container, check out `sxm-docker`_.
+
+.. _sxm-docker: https://github.com/AngellusMortis/sxm-docker
 
 Player Classes
 --------------
 
 Here are a list of know pluggable player classes you can use to extend
-`sxm-player`
+``sxm-player``
 
 * `sxm-discord`_: A Discord bot that lets you play SXM content
 
