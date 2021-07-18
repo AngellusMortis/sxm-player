@@ -2,6 +2,12 @@
 History
 =======
 
+0.2.3 (2021-08-17)
+------------------
+
+* Adds env var for `CLIPlayer` `channel-id`: `SXM_CLI_CHANNEL_ID`
+* Adds env var for `CLIPlayer` `filename`: `SXM_CLI_FILENAME`
+
 0.2.2 (2021-08-17)
 ------------------
 

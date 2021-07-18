@@ -15,12 +15,14 @@ class CLIPlayer(BasePlayer):
             required=True,
             type=str,
             help="SXM Channel to Player",
+            envvar="SXM_CLI_CHANNEL_ID",
         ),
         Option(
             "--filename",
             default="player.mp3",
             type=click.Path(dir_okay=False, writable=True, resolve_path=True),
             help="Path for output mp3 file",
+            envvar="SXM_CLI_FILENAME",
         ),
     ]
 
