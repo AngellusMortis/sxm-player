@@ -16,7 +16,7 @@ requires=[
   'pydantic',
   'pyyaml',
   'sqlalchemy',
-  'sxm>=0.2.5',
+  'sxm>=0.2.7',
   'typer',
 ]
 

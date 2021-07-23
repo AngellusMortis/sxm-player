@@ -18,6 +18,7 @@ class ServerWorker(InterruptableWorker):
 
     _ip: str
     _port: int
+    _precache: bool
     sxm: SXMClient
 
     def __init__(
@@ -28,6 +29,7 @@ class ServerWorker(InterruptableWorker):
         password: str,
         region: RegionChoice,
         quality: QualitySize,
+        precache: bool,
         *args,
         **kwargs,
     ):
@@ -35,6 +37,7 @@ class ServerWorker(InterruptableWorker):
 
         self._port = port
         self._ip = ip
+        self._precache = precache
 
         self.sxm = SXMClient(
             username=username,
@@ -71,7 +74,10 @@ class ServerWorker(InterruptableWorker):
         request_logger.info = request_logger.debug  # type: ignore
 
         app = web.Application()
-        app.router.add_get("/{_:.*}", make_http_handler(self.sxm.async_client))
+        app.router.add_get(
+            "/{_:.*}",
+            make_http_handler(self.sxm.async_client, cache_aac_chunks=self._precache),
+        )
         try:
             self._log.info(f"{self.name} has started on http://{self._ip}:{self._port}")
             web.run_app(

@@ -13,6 +13,7 @@ from sxm.cli import (
     OPTION_HOST,
     OPTION_PASSWORD,
     OPTION_PORT,
+    OPTION_PRECACHE,
     OPTION_QUALITY,
     OPTION_REGION,
     OPTION_USERNAME,
@@ -88,6 +89,7 @@ def main(
     host: str = OPTION_HOST,
     output_folder: Optional[Path] = OPTION_OUTPUT_FOLDER,
     reset_songs: bool = OPTION_RESET_SONGS,
+    precache: bool = OPTION_PRECACHE,
     player_class: Optional[str] = ARG_PLAYER_CLASS,
 ):
     """Command line interface for sxm-player"""
@@ -132,6 +134,7 @@ def spawn_sxm_worker(
     password: str,
     region: RegionChoice,
     quality: QualitySize,
+    precache: bool,
     **kwargs,
 ):
     runner.create_worker(
@@ -143,6 +146,7 @@ def spawn_sxm_worker(
         password=password,
         region=region,
         quality=quality,
+        precache=precache,
     )
 
 

@@ -6,7 +6,7 @@
 #
 aiohttp==3.7.4.post0
     # via sxm
-anyio==3.2.1
+anyio==3.3.0
     # via httpcore
 async-timeout==3.0.1
     # via aiohttp
@@ -86,9 +86,9 @@ sniffio==1.2.0
     #   anyio
     #   httpcore
     #   httpx
-sqlalchemy==1.4.21
+sqlalchemy==1.4.22
     # via sxm_player (pyproject.toml)
-sxm==0.2.5
+sxm==0.2.7
     # via sxm_player (pyproject.toml)
 tenacity==8.0.1
     # via sxm

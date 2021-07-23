@@ -1,7 +1,7 @@
 import logging
 import time
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from pydantic import BaseModel, PrivateAttr  # pylint: disable=no-name-in-module
 from sqlalchemy import Column, DateTime, String
@@ -156,6 +156,8 @@ class PlayerState(BaseModel):
     _start_time: Optional[datetime] = PrivateAttr(None)
     _time_offset: Optional[timedelta] = PrivateAttr(None)
 
+    _channels_lookup_cache: Dict[str, XMChannel] = PrivateAttr({})
+
     @property
     def stream_data(self) -> Tuple[Optional[str], Optional[str]]:
         return (self.stream_channel, self.stream_url)
@@ -182,6 +184,7 @@ class PlayerState(BaseModel):
         """
 
         self._channels = None
+        self._channels_lookup_cache = {}
         self._raw_channels = value
 
         if self._raw_channels is None:
@@ -307,11 +310,13 @@ class PlayerState(BaseModel):
         """Returns channel from list of `channels` with given name"""
 
         name = name.lower()
-        for channel in self.channels:
-            if (
-                channel.name.lower() == name
-                or channel.id.lower() == name
-                or str(channel.channel_number) == name
-            ):
-                return channel
-        return None
+        if name not in self._channels_lookup_cache:
+            for channel in self.channels:
+                if (
+                    channel.name.lower() == name
+                    or channel.id.lower() == name
+                    or str(channel.channel_number) == name
+                ):
+                    self._channels_lookup_cache[name] = channel
+                    break
+        return self._channels_lookup_cache.get(name)
