@@ -88,7 +88,7 @@ sniffio==1.2.0
     #   httpx
 sqlalchemy==1.4.22
     # via sxm_player (pyproject.toml)
-sxm==0.2.7
+sxm==0.2.8
     # via sxm_player (pyproject.toml)
 tenacity==8.0.1
     # via sxm

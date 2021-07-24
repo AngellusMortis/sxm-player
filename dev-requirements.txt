@@ -304,7 +304,7 @@ sqlalchemy-stubs==0.4
     # via sxm_player (pyproject.toml)
 stevedore==3.3.0
     # via bandit
-sxm==0.2.7
+sxm==0.2.8
     # via sxm_player (pyproject.toml)
 tenacity==8.0.1
     # via sxm
