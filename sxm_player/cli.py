@@ -44,7 +44,6 @@ OPTION_LOG_FILE = typer.Option(
     None,
     "-l",
     "--log-file",
-    exists=True,
     file_okay=True,
     resolve_path=True,
     dir_okay=False,
