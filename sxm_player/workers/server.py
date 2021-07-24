@@ -76,7 +76,7 @@ class ServerWorker(InterruptableWorker):
         app = web.Application()
         app.router.add_get(
             "/{_:.*}",
-            make_http_handler(self.sxm.async_client, cache_aac_chunks=self._precache),
+            make_http_handler(self.sxm.async_client, precache=self._precache),
         )
         try:
             self._log.info(f"{self.name} has started on http://{self._ip}:{self._port}")
